@@ -7,12 +7,18 @@ struct RemoteRecipeImage: View {
     var body: some View {
         Group {
             if let imageURL, let url = URL(string: imageURL) {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image.resizable().scaledToFill()
-                    default:
-                        placeholder
+                if url.isFileURL, let image = UIImage(contentsOfFile: url.path) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image.resizable().scaledToFill()
+                        default:
+                            placeholder
+                        }
                     }
                 }
             } else {
@@ -26,7 +32,7 @@ struct RemoteRecipeImage: View {
 
     private var placeholder: some View {
         ZStack {
-            LinearGradient(colors: [RecipeTheme.accentSoft, RecipeTheme.sage.opacity(0.65)], startPoint: .topLeading, endPoint: .bottomTrailing)
+            LinearGradient(colors: [RecipeTheme.accentSoft, RecipeTheme.accent], startPoint: .topLeading, endPoint: .bottomTrailing)
             Image(systemName: "fork.knife.circle.fill")
                 .font(.system(size: 42))
                 .foregroundStyle(.white.opacity(0.9))

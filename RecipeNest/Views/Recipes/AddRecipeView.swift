@@ -1,11 +1,10 @@
-import PhotosUI
 import SwiftUI
+import UIKit
 
 struct AddRecipeView: View {
     @Environment(\.appEnvironment) private var environment
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel: AddRecipeViewModel
-    @State private var selectedPhoto: PhotosPickerItem?
 
     init(userProfile: UserProfile, environment: AppEnvironment = .demo) {
         _viewModel = StateObject(wrappedValue: AddRecipeViewModel(environment: environment, userProfile: userProfile))
@@ -14,8 +13,7 @@ struct AddRecipeView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Recipe") {
-                    TextField("Title", text: $viewModel.draft.title)
+                Section("Recipe Link") {
                     TextField("Source URL", text: $viewModel.draft.sourceURL)
                         .textInputAutocapitalization(.never)
                         .keyboardType(.URL)
@@ -35,8 +33,12 @@ struct AddRecipeView: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
-                    TextField("Description or clipped content", text: $viewModel.draft.description, axis: .vertical)
-                        .lineLimit(4...10)
+
+                    if !viewModel.draft.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                        || !viewModel.draft.description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                        || viewModel.selectedImageData != nil {
+                        importedPreview
+                    }
                 }
 
                 Section("Tags") {
@@ -49,18 +51,12 @@ struct AddRecipeView: View {
                         viewModel.removeTag(tag)
                     }
                 }
-
-                Section("Image") {
-                    PhotosPicker("Choose Photo", selection: $selectedPhoto, matching: .images)
-                }
-
-                Section("Your first note") {
-                    TextField("Comment", text: $viewModel.draft.comments, axis: .vertical)
-                        .lineLimit(3...6)
-                    StarRatingView(rating: $viewModel.draft.rating)
-                }
             }
+            .scrollContentBackground(.hidden)
+            .background(RecipeTheme.pageGradient.ignoresSafeArea())
             .navigationTitle("Add Recipe")
+            .navigationBarTitleDisplayMode(.inline)
+            .tint(RecipeTheme.accentStrong)
             .onChange(of: viewModel.draft.sourceURL) { _, _ in
                 viewModel.scheduleURLImport()
             }
@@ -77,15 +73,8 @@ struct AddRecipeView: View {
                             }
                         }
                     }
-                    .disabled(
-                        viewModel.draft.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-                        viewModel.draft.sourceURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                    )
+                    .disabled(viewModel.draft.sourceURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
-            }
-            .task(id: selectedPhoto) {
-                guard let selectedPhoto else { return }
-                viewModel.selectedImageData = try? await selectedPhoto.loadTransferable(type: Data.self)
             }
             .alert("Unable to save", isPresented: Binding(
                 get: { viewModel.errorMessage != nil },
@@ -97,5 +86,36 @@ struct AddRecipeView: View {
             }
         }
         .environment(\.appEnvironment, environment)
+    }
+
+    @ViewBuilder
+    private var importedPreview: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Imported Preview")
+                .font(.system(size: 14, weight: .bold, design: .rounded))
+
+            if let imageData = viewModel.selectedImageData,
+               let image = UIImage(data: imageData) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(height: 160)
+                    .frame(maxWidth: .infinity)
+                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            }
+
+            if !viewModel.draft.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Text(viewModel.draft.title)
+                    .font(.system(size: 18, weight: .bold, design: .rounded))
+            }
+
+            if !viewModel.draft.description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Text(viewModel.draft.description)
+                    .font(.system(size: 14, weight: .medium, design: .rounded))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(4)
+            }
+        }
+        .padding(.vertical, 4)
     }
 }

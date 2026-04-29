@@ -16,11 +16,9 @@ struct HouseholdOnboardingView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     Text("Set up your shared kitchen")
-                        .font(.system(size: 30, weight: .bold, design: .rounded))
+                        .font(.system(size: 32, weight: .bold, design: .rounded))
 
-                    VStack(alignment: .leading, spacing: 14) {
-                        Text("Create a household")
-                            .font(.headline)
+                    groupedCard(title: "Create a household") {
                         TextField("Household name", text: $viewModel.householdName)
                             .textFieldStyle(.roundedBorder)
                         Button("Create Household") {
@@ -30,13 +28,10 @@ struct HouseholdOnboardingView: View {
                             }
                         }
                         .buttonStyle(.borderedProminent)
+                        .tint(RecipeTheme.accentStrong)
                     }
 
-                    Divider()
-
-                    VStack(alignment: .leading, spacing: 14) {
-                        Text("Join with invite code")
-                            .font(.headline)
+                    groupedCard(title: "Join with invite code") {
                         TextField("Invite code", text: $viewModel.inviteCode)
                             .textInputAutocapitalization(.characters)
                             .textFieldStyle(.roundedBorder)
@@ -46,12 +41,13 @@ struct HouseholdOnboardingView: View {
                                 await sessionViewModel.refreshUserProfile()
                             }
                         }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.borderedProminent)
+                        .tint(RecipeTheme.accentStrong)
                     }
                 }
                 .padding(24)
             }
-            .background(RecipeTheme.background.ignoresSafeArea())
+            .background(RecipeTheme.pageGradient.ignoresSafeArea())
             .alert("Household setup issue", isPresented: Binding(
                 get: { viewModel.errorMessage != nil },
                 set: { if !$0 { viewModel.errorMessage = nil } }
@@ -62,5 +58,18 @@ struct HouseholdOnboardingView: View {
             }
         }
         .environment(\.appEnvironment, environment)
+    }
+
+    private func groupedCard<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text(title)
+                .font(.system(size: 20, weight: .bold, design: .rounded))
+            content()
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RecipeTheme.card)
+        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .shadow(color: RecipeTheme.shadow, radius: 12, y: 8)
     }
 }

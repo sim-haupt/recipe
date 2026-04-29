@@ -20,6 +20,12 @@ final class DemoDataStore {
 
     private init() {}
 
+    func persistImageData(_ data: Data, recipeID: String) throws -> String {
+        let fileURL = try imageDirectoryURL().appendingPathComponent("\(recipeID).jpg")
+        try data.write(to: fileURL, options: .atomic)
+        return fileURL.absoluteString
+    }
+
     func seedIfNeeded() {
         guard users.isEmpty, households.isEmpty else { return }
 
@@ -129,5 +135,16 @@ final class DemoDataStore {
         let key = recipeKey(householdID: householdID, recipeID: recipeID)
         let payload: Result<[Review], Error> = .success((reviewsByRecipeKey[key] ?? []).sorted { $0.updatedAt > $1.updatedAt })
         reviewObservers[key]?.values.forEach { $0(payload) }
+    }
+
+    private func imageDirectoryURL() throws -> URL {
+        let fileManager = FileManager.default
+        guard let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+            throw NSError(domain: "RecipeNestDemo", code: 500, userInfo: [NSLocalizedDescriptionKey: "Could not access local image storage."])
+        }
+
+        let directory = appSupport.appendingPathComponent("RecipeNestDemoImages", isDirectory: true)
+        try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory
     }
 }

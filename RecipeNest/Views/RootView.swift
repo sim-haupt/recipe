@@ -23,8 +23,8 @@ struct RootView: View {
                     }
             }
         }
-        .background(RecipeTheme.background.ignoresSafeArea())
-        .tint(RecipeTheme.accent)
+        .background(RecipeTheme.pageGradient.ignoresSafeArea())
+        .tint(RecipeTheme.accentStrong)
         .alert("Something went wrong", isPresented: Binding(
             get: { sessionViewModel.errorMessage != nil },
             set: { if !$0 { sessionViewModel.errorMessage = nil } }

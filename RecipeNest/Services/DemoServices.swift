@@ -182,6 +182,7 @@ final class DemoRecipeService: RecipeServicing {
         let now = Date()
         let tags = ensureTags(tagNames: input.tagNames, householdID: householdID)
         let recipeID = UUID().uuidString
+        let imageURL = try input.imageData.map { try store.persistImageData($0, recipeID: recipeID) }
 
         var recipes = store.recipesByHousehold[householdID] ?? []
         let recipe = Recipe(
@@ -190,7 +191,7 @@ final class DemoRecipeService: RecipeServicing {
             title: input.title.isEmpty ? "Untitled Recipe" : input.title,
             description: input.description,
             sourceURL: input.sourceURL.isEmpty ? nil : input.sourceURL,
-            imageURL: nil,
+            imageURL: imageURL,
             savedDate: now,
             createdByUserID: author.id,
             createdByName: author.displayName,
