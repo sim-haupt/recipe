@@ -3,6 +3,7 @@ import UIKit
 
 struct RecipeDetailView: View {
     @Environment(\.appEnvironment) private var environment
+    @Environment(\.openURL) private var openURL
     @StateObject private var viewModel: RecipeDetailViewModel
     @State private var isShowingShareSheet = false
 
@@ -46,6 +47,18 @@ struct RecipeDetailView: View {
                     isShowingShareSheet = true
                 } label: {
                     Image(systemName: "square.and.arrow.up")
+                }
+            }
+
+            if viewModel.recipe.sourceURL.flatMap(URL.init(string:)) != nil {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        if let sourceURL = viewModel.recipe.sourceURL, let url = URL(string: sourceURL) {
+                            openURL(url)
+                        }
+                    } label: {
+                        Image(systemName: "safari")
+                    }
                 }
             }
         }
@@ -113,16 +126,6 @@ struct RecipeDetailView: View {
     private func overviewCard(metrics: RecipeDetailLayoutMetrics) -> some View {
         detailCard(metrics: metrics) {
             VStack(alignment: .leading, spacing: 14) {
-                if let sourceURL = viewModel.recipe.sourceURL, let url = URL(string: sourceURL) {
-                    Link(destination: url) {
-                        Label("Open Source", systemImage: "safari")
-                            .font(.system(size: metrics.bodyTextSize, weight: .semibold, design: .rounded))
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(RecipeTheme.accentStrong)
-                }
-
                 Text(viewModel.recipe.description.isEmpty ? "No clipped description yet." : viewModel.recipe.description)
                     .font(.system(size: metrics.bodyTextSize, weight: .medium, design: .rounded))
                     .foregroundStyle(RecipeTheme.textPrimary)

@@ -427,7 +427,7 @@ private struct FilterButton: View {
 
     var body: some View {
         Button(action: action) {
-            ZStack(alignment: .topTrailing) {
+            ZStack {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .fill(Color.white.opacity(0.97))
                     .frame(width: side, height: side)
@@ -437,14 +437,20 @@ private struct FilterButton: View {
                     .foregroundStyle(isActive ? RecipeTheme.accentStrong : Color.black.opacity(0.34))
 
                 if isActive {
-                    Text("\(min(count, 9))")
-                        .font(.system(size: 10, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
-                        .frame(minWidth: 18, minHeight: 18)
-                        .background(RecipeTheme.accentStrong)
-                        .clipShape(Capsule())
-                        .padding(.trailing, -7)
-                        .padding(.top, -7)
+                    VStack {
+                        HStack {
+                            Spacer()
+                            Text("\(min(count, 9))")
+                                .font(.system(size: 10, weight: .bold, design: .rounded))
+                                .foregroundStyle(.white)
+                                .frame(minWidth: 18, minHeight: 18)
+                                .background(RecipeTheme.accentStrong)
+                                .clipShape(Capsule())
+                                .offset(x: 7, y: -7)
+                        }
+                        Spacer()
+                    }
+                    .frame(width: side, height: side)
                 }
             }
             .shadow(color: Color.black.opacity(0.08), radius: 10, y: 5)
@@ -620,8 +626,8 @@ private struct HomeBottomDock: View {
             HomeBottomDockItem(systemName: "rectangle.portrait.and.arrow.right", title: "Sign Out", isActive: false, action: signOutAction)
         }
         .padding(.horizontal, metrics.dockHorizontalPadding)
-        .padding(.top, 12)
-        .padding(.bottom, max(bottomInset, 12))
+        .padding(.top, 8)
+        .padding(.bottom, max(8, bottomInset - 6))
         .frame(maxWidth: .infinity)
         .background {
             Rectangle()
@@ -670,10 +676,10 @@ private struct HomeLayoutMetrics {
 
     var horizontalPadding: CGFloat { availableWidth < 380 ? 16 : 20 }
     var sectionSpacing: CGFloat { availableWidth < 380 ? 24 : 28 }
-    var heroHeight: CGFloat { availableWidth < 380 ? 256 : 278 }
-    var heroTopPadding: CGFloat { availableWidth < 380 ? 8 : 10 }
-    var heroBottomPadding: CGFloat { availableWidth < 380 ? 28 : 30 }
-    var heroContentSpacing: CGFloat { availableWidth < 380 ? 16 : 18 }
+    var heroHeight: CGFloat { availableWidth < 380 ? 196 : 210 }
+    var heroTopPadding: CGFloat { availableWidth < 380 ? 2 : 4 }
+    var heroBottomPadding: CGFloat { availableWidth < 380 ? 12 : 14 }
+    var heroContentSpacing: CGFloat { availableWidth < 380 ? 12 : 14 }
     var avatarSize: CGFloat { availableWidth < 380 ? 44 : 48 }
     var avatarFontSize: CGFloat { availableWidth < 380 ? 14 : 15 }
     var heroTitleSize: CGFloat { availableWidth < 380 ? 17 : 18 }
@@ -734,14 +740,17 @@ private struct HomePreviewHost: View {
 
 #Preview("iPhone 16 Pro") {
     HomePreviewHost()
+        .previewLayout(.device)
 }
 
 #Preview("iPhone SE") {
     HomePreviewHost()
+        .previewLayout(.device)
         .previewDevice("iPhone SE (3rd generation)")
 }
 
 #Preview("iPhone 16 Pro Max") {
     HomePreviewHost()
+        .previewLayout(.device)
         .previewDevice("iPhone 16 Pro Max")
 }
