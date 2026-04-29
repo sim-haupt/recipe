@@ -7,8 +7,8 @@ struct AddRecipeView: View {
     @StateObject private var viewModel: AddRecipeViewModel
     @State private var selectedPhoto: PhotosPickerItem?
 
-    init(userProfile: UserProfile) {
-        _viewModel = StateObject(wrappedValue: AddRecipeViewModel(environment: .live, userProfile: userProfile))
+    init(userProfile: UserProfile, environment: AppEnvironment = .demo) {
+        _viewModel = StateObject(wrappedValue: AddRecipeViewModel(environment: environment, userProfile: userProfile))
     }
 
     var body: some View {

@@ -6,9 +6,9 @@ struct HomeView: View {
     @StateObject private var viewModel: HomeViewModel
     let userProfile: UserProfile
 
-    init(userProfile: UserProfile) {
+    init(userProfile: UserProfile, environment: AppEnvironment = .demo) {
         self.userProfile = userProfile
-        _viewModel = StateObject(wrappedValue: HomeViewModel(environment: .live, userProfile: userProfile))
+        _viewModel = StateObject(wrappedValue: HomeViewModel(environment: environment, userProfile: userProfile))
     }
 
     private let columns = [
@@ -35,7 +35,7 @@ struct HomeView: View {
                     LazyVGrid(columns: columns, spacing: 16) {
                         ForEach(viewModel.filteredRecipes) { recipe in
                             NavigationLink {
-                                RecipeDetailView(recipe: recipe, userProfile: userProfile)
+                                RecipeDetailView(recipe: recipe, userProfile: userProfile, environment: environment)
                             } label: {
                                 RecipeCardView(recipe: recipe)
                             }
@@ -64,7 +64,7 @@ struct HomeView: View {
                 }
             }
             .sheet(isPresented: $viewModel.isShowingAddRecipe) {
-                AddRecipeView(userProfile: userProfile)
+                AddRecipeView(userProfile: userProfile, environment: environment)
             }
             .task {
                 viewModel.start()

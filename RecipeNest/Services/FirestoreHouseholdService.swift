@@ -2,7 +2,9 @@ import FirebaseFirestore
 import Foundation
 
 final class FirestoreHouseholdService: HouseholdServicing {
-    private let database = Firestore.firestore()
+    private var database: Firestore {
+        Firestore.firestore()
+    }
 
     func loadUserProfile(userID: String) async throws -> UserProfile? {
         let document = try await database.collection("users").document(userID).getDocument()

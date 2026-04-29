@@ -12,9 +12,9 @@ struct RootView: View {
                 AuthView()
             } else if let userProfile = sessionViewModel.userProfile {
                 if userProfile.activeHouseholdID == nil {
-                    HouseholdOnboardingView(userProfile: userProfile)
+                    HouseholdOnboardingView(userProfile: userProfile, environment: environment)
                 } else {
-                    HomeView(userProfile: userProfile)
+                    HomeView(userProfile: userProfile, environment: environment)
                 }
             } else {
                 ProgressView("Preparing your account...")

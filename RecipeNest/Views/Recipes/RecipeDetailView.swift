@@ -6,8 +6,8 @@ struct RecipeDetailView: View {
     @StateObject private var viewModel: RecipeDetailViewModel
     @State private var isShowingShareSheet = false
 
-    init(recipe: Recipe, userProfile: UserProfile) {
-        _viewModel = StateObject(wrappedValue: RecipeDetailViewModel(recipe: recipe, environment: .live, userProfile: userProfile))
+    init(recipe: Recipe, userProfile: UserProfile, environment: AppEnvironment = .demo) {
+        _viewModel = StateObject(wrappedValue: RecipeDetailViewModel(recipe: recipe, environment: environment, userProfile: userProfile))
     }
 
     var body: some View {

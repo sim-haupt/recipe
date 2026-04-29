@@ -6,9 +6,9 @@ struct HouseholdOnboardingView: View {
     @StateObject private var viewModel: HouseholdViewModel
     let userProfile: UserProfile
 
-    init(userProfile: UserProfile) {
+    init(userProfile: UserProfile, environment: AppEnvironment = .demo) {
         self.userProfile = userProfile
-        _viewModel = StateObject(wrappedValue: HouseholdViewModel(environment: .live))
+        _viewModel = StateObject(wrappedValue: HouseholdViewModel(environment: environment))
     }
 
     var body: some View {

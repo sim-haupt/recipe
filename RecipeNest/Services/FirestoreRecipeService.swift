@@ -3,8 +3,13 @@ import FirebaseStorage
 import Foundation
 
 final class FirestoreRecipeService: RecipeServicing {
-    private let database = Firestore.firestore()
-    private let storage = Storage.storage()
+    private var database: Firestore {
+        Firestore.firestore()
+    }
+
+    private var storage: Storage {
+        Storage.storage()
+    }
 
     func observeRecipes(householdID: String, onChange: @escaping (Result<[Recipe], Error>) -> Void) -> RealtimeListening {
         let listener = database.collection("households")
