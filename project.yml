@@ -1,0 +1,84 @@
+name: RecipeNest
+options:
+  bundleIdPrefix: com.example
+  deploymentTarget:
+    iOS: "17.0"
+packages:
+  Firebase:
+    url: https://github.com/firebase/firebase-ios-sdk.git
+    from: 10.24.0
+targets:
+  RecipeNest:
+    type: application
+    platform: iOS
+    sources:
+      - path: RecipeNest
+      - path: RecipeCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.recipenest
+        PRODUCT_NAME: RecipeNest
+        SWIFT_VERSION: 5.10
+        INFOPLIST_KEY_CFBundleDisplayName: RecipeNest
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: true
+        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: true
+        INFOPLIST_KEY_UILaunchScreen_Generation: true
+        INFOPLIST_KEY_UIRequiresFullScreen: false
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.food-and-drink
+        INFOPLIST_KEY_CFBundleURLTypes:
+          - CFBundleURLSchemes:
+              - recipenest
+        DEVELOPMENT_ASSET_PATHS: "\"RecipeNest/Preview Content\""
+        TARGETED_DEVICE_FAMILY: 1
+        IPHONEOS_DEPLOYMENT_TARGET: 17.0
+        CODE_SIGN_ENTITLEMENTS: Config/RecipeNest.entitlements
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+    dependencies:
+      - package: Firebase
+        product: FirebaseAuth
+      - package: Firebase
+        product: FirebaseCore
+      - package: Firebase
+        product: FirebaseFirestore
+      - package: Firebase
+        product: FirebaseStorage
+    info:
+      path: Config/RecipeNest-Info.plist
+      properties:
+        UIApplicationSupportsMultipleScenes: false
+  RecipeNestShareExtension:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: ShareExtension
+      - path: RecipeCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.recipenest.share
+        PRODUCT_NAME: RecipeNest Share Extension
+        SWIFT_VERSION: 5.10
+        IPHONEOS_DEPLOYMENT_TARGET: 17.0
+        CODE_SIGN_ENTITLEMENTS: Config/RecipeNestShareExtension.entitlements
+        SKIP_INSTALL: true
+        TARGETED_DEVICE_FAMILY: 1
+    info:
+      path: Config/RecipeNestShareExtension-Info.plist
+      properties:
+        CFBundleDisplayName: Save to RecipeNest
+        NSExtension:
+          NSExtensionAttributes:
+            NSExtensionActivationRule:
+              NSExtensionActivationSupportsAttachmentsWithMaxCount: 10
+              NSExtensionActivationSupportsImageWithMaxCount: 10
+              NSExtensionActivationSupportsMovieWithMaxCount: 0
+              NSExtensionActivationSupportsText: true
+              NSExtensionActivationSupportsWebURLWithMaxCount: 5
+              NSExtensionActivationSupportsWebPageWithMaxCount: 1
+          NSExtensionPointIdentifier: com.apple.share-services
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareViewController
+schemes:
+  RecipeNest:
+    build:
+      targets:
+        RecipeNest: all
+        RecipeNestShareExtension: all
