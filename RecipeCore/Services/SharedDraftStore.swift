@@ -86,9 +86,7 @@ final class SharedDraftStore {
     }
 
     private func draftsFileURL(createIfMissing: Bool) -> URL? {
-        guard let container = fileManager.containerURL(forSecurityApplicationGroupIdentifier: AppConstants.appGroupIdentifier) else {
-            return nil
-        }
+        guard let container = baseContainerURL(createIfMissing: createIfMissing) else { return nil }
 
         if createIfMissing {
             try? fileManager.createDirectory(at: container, withIntermediateDirectories: true, attributes: nil)
@@ -98,9 +96,7 @@ final class SharedDraftStore {
     }
 
     private func sharedImagesDirectoryURL(createIfMissing: Bool = false) -> URL? {
-        guard let container = fileManager.containerURL(forSecurityApplicationGroupIdentifier: AppConstants.appGroupIdentifier) else {
-            return nil
-        }
+        guard let container = baseContainerURL(createIfMissing: createIfMissing) else { return nil }
 
         let directory = container.appendingPathComponent(AppConstants.sharedImagesDirectoryName, isDirectory: true)
         if createIfMissing {
@@ -108,5 +104,22 @@ final class SharedDraftStore {
         }
 
         return directory
+    }
+
+    private func baseContainerURL(createIfMissing: Bool) -> URL? {
+        if let appGroupContainer = fileManager.containerURL(forSecurityApplicationGroupIdentifier: AppConstants.appGroupIdentifier) {
+            return appGroupContainer
+        }
+
+        guard let appSupportDirectory = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+            return nil
+        }
+
+        let fallbackDirectory = appSupportDirectory.appendingPathComponent(AppConstants.localDraftsDirectoryName, isDirectory: true)
+        if createIfMissing {
+            try? fileManager.createDirectory(at: fallbackDirectory, withIntermediateDirectories: true, attributes: nil)
+        }
+
+        return fallbackDirectory
     }
 }

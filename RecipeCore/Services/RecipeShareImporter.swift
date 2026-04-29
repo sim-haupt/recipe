@@ -1,4 +1,5 @@
 import Foundation
+import LinkPresentation
 import UniformTypeIdentifiers
 import UIKit
 
@@ -44,6 +45,30 @@ final class RecipeShareImporter {
             }
         }
 
+        if let sharedSourceURL = sourceURL, let normalizedURL = normalizedURL(from: sharedSourceURL) {
+            let remoteMetadata = await fetchRemoteMetadata(from: normalizedURL)
+
+            if let canonicalURL = remoteMetadata?.canonicalURL {
+                sourceURL = canonicalURL.absoluteString
+            }
+
+            if let remoteTitle = remoteMetadata?.bestTitle,
+               (title.isEmpty || isLikelyFallbackTitle(title, for: sharedSourceURL)) {
+                title = remoteTitle
+            }
+
+            if let remoteDescription = remoteMetadata?.bestDescription, description.isEmpty {
+                description = remoteDescription
+            }
+
+            if imageData == nil {
+                imageData = await fetchImageData(
+                    provider: remoteMetadata?.linkMetadata?.imageProvider,
+                    fallbackImageURL: remoteMetadata?.imageURL
+                )
+            }
+        }
+
         if title.isEmpty {
             if let sourceURL, let host = URL(string: sourceURL)?.host {
                 title = host.replacingOccurrences(of: "www.", with: "").capitalized
@@ -77,9 +102,89 @@ final class RecipeShareImporter {
             .description ?? "Untitled Recipe"
     }
 
+    private func normalizedURL(from value: String) -> URL? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        if let directURL = URL(string: trimmed), directURL.scheme != nil {
+            return directURL
+        }
+
+        return URL(string: "https://\(trimmed)")
+    }
+
+    private func isLikelyFallbackTitle(_ title: String, for sourceURL: String?) -> Bool {
+        guard let sourceURL, let host = URL(string: sourceURL)?.host else {
+            return title == "Untitled Recipe"
+        }
+
+        let fallbackHostTitle = host.replacingOccurrences(of: "www.", with: "").capitalized
+        return title == fallbackHostTitle || title == "Untitled Recipe"
+    }
+
     private func append(_ existing: String, with newValue: String) -> String {
         if existing.isEmpty { return newValue }
         return existing + "\n\n" + newValue
+    }
+
+    private func fetchRemoteMetadata(from url: URL) async -> RemoteMetadata? {
+        async let linkMetadataTask = fetchLinkMetadata(from: url)
+        async let htmlMetadataTask = fetchHTMLMetadata(from: url)
+
+        let linkMetadata = try? await linkMetadataTask
+        let htmlMetadata = try? await htmlMetadataTask
+
+        guard linkMetadata != nil || htmlMetadata != nil else {
+            return nil
+        }
+
+        return RemoteMetadata(
+            canonicalURL: htmlMetadata?.canonicalURL ?? linkMetadata?.originalURL ?? linkMetadata?.url ?? url,
+            title: firstNonEmpty([
+                htmlMetadata?.openGraphTitle,
+                htmlMetadata?.twitterTitle,
+                htmlMetadata?.pageTitle,
+                linkMetadata?.title
+            ]),
+            description: firstNonEmpty([
+                htmlMetadata?.openGraphDescription,
+                htmlMetadata?.twitterDescription,
+                htmlMetadata?.metaDescription
+            ]),
+            imageURL: htmlMetadata?.imageURL,
+            linkMetadata: linkMetadata
+        )
+    }
+
+    private func fetchLinkMetadata(from url: URL) async throws -> LPLinkMetadata {
+        try await withCheckedThrowingContinuation { continuation in
+            let provider = LPMetadataProvider()
+            provider.startFetchingMetadata(for: url) { metadata, error in
+                if let metadata {
+                    continuation.resume(returning: metadata)
+                } else if let error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume(throwing: URLError(.badServerResponse))
+                }
+            }
+        }
+    }
+
+    private func fetchHTMLMetadata(from url: URL) async throws -> HTMLMetadata {
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 15
+        request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)", forHTTPHeaderField: "User-Agent")
+
+        let (data, _) = try await URLSession.shared.data(for: request)
+        let html = String(data: data, encoding: .utf8) ?? String(decoding: data, as: UTF8.self)
+        return HTMLMetadata(html: html, baseURL: url)
+    }
+
+    private func firstNonEmpty(_ values: [String?]) -> String? {
+        values
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .first(where: { !$0.isEmpty })
     }
 
     private func loadURL(from provider: NSItemProvider) async -> URL? {
@@ -140,5 +245,97 @@ final class RecipeShareImporter {
         }
 
         return nil
+    }
+
+    private func fetchImageData(provider: NSItemProvider?, fallbackImageURL: URL?) async -> Data? {
+        if let provider, let providerImageData = await loadImageData(from: provider) {
+            return providerImageData
+        }
+
+        if let fallbackImageURL {
+            do {
+                let (data, _) = try await URLSession.shared.data(from: fallbackImageURL)
+                return data
+            } catch {
+                return nil
+            }
+        }
+
+        return nil
+    }
+}
+
+private struct RemoteMetadata {
+    let canonicalURL: URL
+    let title: String?
+    let description: String?
+    let imageURL: URL?
+    let linkMetadata: LPLinkMetadata?
+
+    var bestTitle: String? { title }
+    var bestDescription: String? { description }
+}
+
+private struct HTMLMetadata {
+    let pageTitle: String?
+    let metaDescription: String?
+    let openGraphTitle: String?
+    let openGraphDescription: String?
+    let twitterTitle: String?
+    let twitterDescription: String?
+    let canonicalURL: URL?
+    let imageURL: URL?
+
+    init(html: String, baseURL: URL) {
+        pageTitle = HTMLMetadata.capture(in: html, pattern: "<title[^>]*>(.*?)</title>")
+        metaDescription = HTMLMetadata.metaContent(in: html, key: "description")
+        openGraphTitle = HTMLMetadata.metaContent(in: html, property: "og:title")
+        openGraphDescription = HTMLMetadata.metaContent(in: html, property: "og:description")
+        twitterTitle = HTMLMetadata.metaContent(in: html, key: "twitter:title")
+        twitterDescription = HTMLMetadata.metaContent(in: html, key: "twitter:description")
+
+        let canonicalValue = HTMLMetadata.capture(in: html, pattern: "<link[^>]*rel=[\"']canonical[\"'][^>]*href=[\"'](.*?)[\"'][^>]*>")
+        canonicalURL = canonicalValue.flatMap { URL(string: $0, relativeTo: baseURL)?.absoluteURL }
+
+        let imageValue = HTMLMetadata.metaContent(in: html, property: "og:image")
+            ?? HTMLMetadata.metaContent(in: html, key: "twitter:image")
+        imageURL = imageValue.flatMap { URL(string: $0, relativeTo: baseURL)?.absoluteURL }
+    }
+
+    private static func metaContent(in html: String, key: String? = nil, property: String? = nil) -> String? {
+        if let property {
+            return capture(in: html, pattern: "<meta[^>]*property=[\"']\(NSRegularExpression.escapedPattern(for: property))[\"'][^>]*content=[\"'](.*?)[\"'][^>]*>")
+        }
+
+        if let key {
+            return capture(in: html, pattern: "<meta[^>]*name=[\"']\(NSRegularExpression.escapedPattern(for: key))[\"'][^>]*content=[\"'](.*?)[\"'][^>]*>")
+        }
+
+        return nil
+    }
+
+    private static func capture(in html: String, pattern: String) -> String? {
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive, .dotMatchesLineSeparators]) else {
+            return nil
+        }
+
+        let range = NSRange(html.startIndex..<html.endIndex, in: html)
+        guard let match = regex.firstMatch(in: html, options: [], range: range),
+              let captureRange = Range(match.range(at: 1), in: html) else {
+            return nil
+        }
+
+        return decodeHTMLEntities(String(html[captureRange]))
+    }
+
+    private static func decodeHTMLEntities(_ string: String) -> String {
+        string
+            .replacingOccurrences(of: "&amp;", with: "&")
+            .replacingOccurrences(of: "&quot;", with: "\"")
+            .replacingOccurrences(of: "&#39;", with: "'")
+            .replacingOccurrences(of: "&apos;", with: "'")
+            .replacingOccurrences(of: "&lt;", with: "<")
+            .replacingOccurrences(of: "&gt;", with: ">")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

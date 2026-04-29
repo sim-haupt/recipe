@@ -4,4 +4,5 @@ enum AppConstants {
     static let appGroupIdentifier = "group.com.example.recipenest"
     static let pendingShareDraftsFileName = "pending-share-drafts.json"
     static let sharedImagesDirectoryName = "SharedRecipeImages"
+    static let localDraftsDirectoryName = "RecipeNestLocalDrafts"
 }

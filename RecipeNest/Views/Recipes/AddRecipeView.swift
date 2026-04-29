@@ -19,6 +19,22 @@ struct AddRecipeView: View {
                     TextField("Source URL", text: $viewModel.draft.sourceURL)
                         .textInputAutocapitalization(.never)
                         .keyboardType(.URL)
+                        .textContentType(.URL)
+                        .submitLabel(.go)
+                        .onSubmit {
+                            Task {
+                                await viewModel.fetchMetadataFromSourceURL(force: true)
+                            }
+                        }
+                    if viewModel.isImportingURL {
+                        HStack(spacing: 10) {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text("Fetching title, image, and description…")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                     TextField("Description or clipped content", text: $viewModel.draft.description, axis: .vertical)
                         .lineLimit(4...10)
                 }
@@ -45,6 +61,9 @@ struct AddRecipeView: View {
                 }
             }
             .navigationTitle("Add Recipe")
+            .onChange(of: viewModel.draft.sourceURL) { _, _ in
+                viewModel.scheduleURLImport()
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") { dismiss() }
@@ -58,7 +77,10 @@ struct AddRecipeView: View {
                             }
                         }
                     }
-                    .disabled(viewModel.draft.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .disabled(
+                        viewModel.draft.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+                        viewModel.draft.sourceURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    )
                 }
             }
             .task(id: selectedPhoto) {
