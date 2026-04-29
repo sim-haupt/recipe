@@ -5,25 +5,31 @@ struct RootView: View {
     @Environment(\.appEnvironment) private var environment
 
     var body: some View {
-        Group {
-            if sessionViewModel.isLoading {
-                ProgressView("Loading your recipe box...")
-            } else if sessionViewModel.session == nil {
-                AuthView()
-            } else if let userProfile = sessionViewModel.userProfile {
-                if userProfile.activeHouseholdID == nil {
-                    HouseholdOnboardingView(userProfile: userProfile, environment: environment)
-                } else {
-                    HomeView(userProfile: userProfile, environment: environment)
-                }
-            } else {
-                ProgressView("Preparing your account...")
-                    .task {
-                        await sessionViewModel.refreshUserProfile()
+        ZStack {
+            RecipeTheme.pageGradient
+                .ignoresSafeArea()
+
+            Group {
+                if sessionViewModel.isLoading {
+                    ProgressView("Loading your recipe box...")
+                } else if sessionViewModel.session == nil {
+                    AuthView()
+                } else if let userProfile = sessionViewModel.userProfile {
+                    if userProfile.activeHouseholdID == nil {
+                        HouseholdOnboardingView(userProfile: userProfile, environment: environment)
+                    } else {
+                        HomeView(userProfile: userProfile, environment: environment)
                     }
+                } else {
+                    ProgressView("Preparing your account...")
+                        .task {
+                            await sessionViewModel.refreshUserProfile()
+                        }
+                }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .background(RecipeTheme.pageGradient.ignoresSafeArea())
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .tint(RecipeTheme.accentStrong)
         .alert("Something went wrong", isPresented: Binding(
             get: { sessionViewModel.errorMessage != nil },
