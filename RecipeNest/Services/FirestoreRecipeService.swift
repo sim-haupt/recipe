@@ -287,12 +287,3 @@ private func mapReview(_ document: QueryDocumentSnapshot) -> Review {
         updatedAt: (data["updatedAt"] as? Timestamp)?.dateValue() ?? Date()
     )
 }
-
-private extension String {
-    var normalizedTag: String {
-        lowercased()
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .replacingOccurrences(of: "[^a-z0-9]+", with: "-", options: .regularExpression)
-            .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
-    }
-}

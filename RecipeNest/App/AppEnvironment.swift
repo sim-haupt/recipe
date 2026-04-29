@@ -5,11 +5,26 @@ struct AppEnvironment {
     let householdService: HouseholdServicing
     let recipeService: RecipeServicing
     let sharedDraftStore: SharedDraftStore
+    let mode: AppMode
+
+    enum AppMode {
+        case firebase
+        case demo
+    }
 
     static let live = AppEnvironment(
         authService: FirebaseAuthService(),
         householdService: FirestoreHouseholdService(),
         recipeService: FirestoreRecipeService(),
-        sharedDraftStore: SharedDraftStore()
+        sharedDraftStore: SharedDraftStore(),
+        mode: .firebase
+    )
+
+    static let demo = AppEnvironment(
+        authService: DemoAuthService(),
+        householdService: DemoHouseholdService(),
+        recipeService: DemoRecipeService(),
+        sharedDraftStore: SharedDraftStore(),
+        mode: .demo
     )
 }
