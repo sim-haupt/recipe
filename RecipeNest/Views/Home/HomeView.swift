@@ -23,12 +23,12 @@ struct HomeView: View {
     }
 
     var body: some View {
-        GeometryReader { proxy in
-            let metrics = HomeLayoutMetrics(availableWidth: proxy.size.width)
-            let topInset = proxy.safeAreaInsets.top
-            let bottomInset = proxy.safeAreaInsets.bottom
+        NavigationStack {
+            GeometryReader { proxy in
+                let metrics = HomeLayoutMetrics(availableWidth: proxy.size.width)
+                let topInset = proxy.safeAreaInsets.top
+                let bottomInset = proxy.safeAreaInsets.bottom
 
-            NavigationStack {
                 ZStack {
                     RecipeTheme.homeBackdrop
                         .ignoresSafeArea()
@@ -112,31 +112,33 @@ struct HomeView: View {
                         }
                     )
                 }
-                .toolbar(.hidden, for: .navigationBar)
-                .sheet(isPresented: $viewModel.isShowingAddRecipe) {
-                    AddRecipeView(userProfile: userProfile, environment: environment)
-                }
-                .task {
-                    viewModel.start()
-                }
-                .onChange(of: scenePhase) { _, newPhase in
-                    guard newPhase == .active else { return }
-                    Task {
-                        await viewModel.importPendingDraftsIfNeeded()
-                    }
-                }
-                .alert("Recipe sync issue", isPresented: Binding(
-                    get: { viewModel.errorMessage != nil },
-                    set: { if !$0 { viewModel.errorMessage = nil } }
-                )) {
-                    Button("OK", role: .cancel) {}
-                } message: {
-                    Text(viewModel.errorMessage ?? "")
-                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(RecipeTheme.homeBackdrop.ignoresSafeArea())
+            .toolbar(.hidden, for: .navigationBar)
+            .sheet(isPresented: $viewModel.isShowingAddRecipe) {
+                AddRecipeView(userProfile: userProfile, environment: environment)
+            }
+            .task {
+                viewModel.start()
+            }
+            .onChange(of: scenePhase) { _, newPhase in
+                guard newPhase == .active else { return }
+                Task {
+                    await viewModel.importPendingDraftsIfNeeded()
+                }
+            }
+            .alert("Recipe sync issue", isPresented: Binding(
+                get: { viewModel.errorMessage != nil },
+                set: { if !$0 { viewModel.errorMessage = nil } }
+            )) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(viewModel.errorMessage ?? "")
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(RecipeTheme.homeBackdrop.ignoresSafeArea())
         .environment(\.appEnvironment, environment)
     }
 
@@ -715,19 +717,31 @@ private enum HomePreviewData {
     )
 }
 
+private struct HomePreviewHost: View {
+    private let sessionViewModel = SessionViewModel(environment: .demo)
+
+    var body: some View {
+        GeometryReader { _ in
+            HomeView(userProfile: HomePreviewData.user, environment: .demo)
+                .environmentObject(sessionViewModel)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(RecipeTheme.homeBackdrop.ignoresSafeArea())
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(RecipeTheme.homeBackdrop.ignoresSafeArea())
+    }
+}
+
 #Preview("iPhone 16 Pro") {
-    HomeView(userProfile: HomePreviewData.user, environment: .demo)
-        .environmentObject(SessionViewModel(environment: .demo))
+    HomePreviewHost()
 }
 
 #Preview("iPhone SE") {
-    HomeView(userProfile: HomePreviewData.user, environment: .demo)
-        .environmentObject(SessionViewModel(environment: .demo))
+    HomePreviewHost()
         .previewDevice("iPhone SE (3rd generation)")
 }
 
 #Preview("iPhone 16 Pro Max") {
-    HomeView(userProfile: HomePreviewData.user, environment: .demo)
-        .environmentObject(SessionViewModel(environment: .demo))
+    HomePreviewHost()
         .previewDevice("iPhone 16 Pro Max")
 }
