@@ -11,6 +11,7 @@ final class HomeViewModel: ObservableObject {
 
     private let environment: AppEnvironment
     private let userProfile: UserProfile
+    private var isImportingPendingDrafts = false
     private var recipeListener: RealtimeListening?
     private var tagListener: RealtimeListening?
 
@@ -30,6 +31,17 @@ final class HomeViewModel: ObservableObject {
 
             return matchesSearch && matchesTags
         }
+    }
+
+    var favoriteRecipes: [Recipe] {
+        filteredRecipes
+            .filter(\.isFavorite)
+            .sorted { lhs, rhs in
+                if lhs.updatedAt == rhs.updatedAt {
+                    return lhs.savedDate > rhs.savedDate
+                }
+                return lhs.updatedAt > rhs.updatedAt
+            }
     }
 
     func start() {
@@ -73,8 +85,22 @@ final class HomeViewModel: ObservableObject {
         }
     }
 
+    func toggleFavorite(_ recipe: Recipe) async {
+        guard let householdID = userProfile.activeHouseholdID else { return }
+
+        do {
+            try await environment.recipeService.updateFavorite(recipe: recipe, householdID: householdID, isFavorite: !recipe.isFavorite)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     func importPendingDraftsIfNeeded() async {
         guard let householdID = userProfile.activeHouseholdID else { return }
+        guard !isImportingPendingDrafts else { return }
+
+        isImportingPendingDrafts = true
+        defer { isImportingPendingDrafts = false }
 
         do {
             let drafts = try environment.sharedDraftStore.pendingDrafts().filter { $0.importedAt == nil }

@@ -13,6 +13,7 @@ struct Recipe: Identifiable, Codable, Hashable {
     var updatedAt: Date
     var tagIDs: [String]
     var tagNames: [String]
+    var isFavorite: Bool
     var averageRating: Double?
     var reviewCount: Int
 }

@@ -198,6 +198,7 @@ final class DemoRecipeService: RecipeServicing {
             updatedAt: now,
             tagIDs: tags.map(\.id),
             tagNames: tags.map(\.name),
+            isFavorite: false,
             averageRating: input.initialRating > 0 ? Double(input.initialRating) : nil,
             reviewCount: input.initialRating > 0 ? 1 : 0
         )
@@ -226,6 +227,16 @@ final class DemoRecipeService: RecipeServicing {
         store.recipesByHousehold[householdID] = recipes
         store.notifyRecipes(householdID: householdID)
         store.notifyTags(householdID: householdID)
+    }
+
+    func updateFavorite(recipe: Recipe, householdID: String, isFavorite: Bool) async throws {
+        guard var recipes = store.recipesByHousehold[householdID],
+              let index = recipes.firstIndex(where: { $0.id == recipe.id }) else { return }
+
+        recipes[index].isFavorite = isFavorite
+        recipes[index].updatedAt = Date()
+        store.recipesByHousehold[householdID] = recipes
+        store.notifyRecipes(householdID: householdID)
     }
 
     func addComment(recipe: Recipe, householdID: String, text: String, author: UserProfile) async throws {

@@ -99,8 +99,8 @@ struct AddRecipeView: View {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
-                    .frame(height: 160)
-                    .frame(maxWidth: .infinity)
+                    .frame(maxWidth: .infinity, minHeight: 160, maxHeight: 160, alignment: .center)
+                    .clipped()
                     .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             }
 

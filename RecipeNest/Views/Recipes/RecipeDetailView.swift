@@ -21,7 +21,6 @@ struct RecipeDetailView: View {
                     tagsCard(metrics: metrics)
                     reviewCard(metrics: metrics)
                     commentsCard(metrics: metrics)
-                    ratingsCard(metrics: metrics)
                 }
                 .frame(maxWidth: metrics.contentWidth, alignment: .leading)
                 .padding(.horizontal, metrics.horizontalPadding)
@@ -33,6 +32,15 @@ struct RecipeDetailView: View {
         .navigationTitle("Recipe Details")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    Task { await viewModel.toggleFavorite() }
+                } label: {
+                    Image(systemName: viewModel.recipe.isFavorite ? "heart.fill" : "heart")
+                        .foregroundStyle(viewModel.recipe.isFavorite ? Color.red : RecipeTheme.accentStrong)
+                }
+            }
+
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     isShowingShareSheet = true
@@ -187,34 +195,6 @@ struct RecipeDetailView: View {
         }
     }
 
-    private func ratingsCard(metrics: RecipeDetailLayoutMetrics) -> some View {
-        detailCard(title: "Community Ratings", metrics: metrics) {
-            VStack(alignment: .leading, spacing: 12) {
-                ForEach(viewModel.reviews) { review in
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack {
-                            Text(review.authorName)
-                                .font(.system(size: metrics.bodyTextSize - 1, weight: .bold, design: .rounded))
-                            Spacer()
-                            StaticStarRatingView(rating: review.rating)
-                        }
-                        if !review.note.isEmpty {
-                            Text(review.note)
-                                .font(.system(size: metrics.bodyTextSize - 1, weight: .medium, design: .rounded))
-                        }
-                        Text(review.updatedAt.formatted(date: .abbreviated, time: .shortened))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(14)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(RecipeTheme.secondaryCard)
-                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                }
-            }
-        }
-    }
-
     @ViewBuilder
     private func detailCard<Content: View>(title: String? = nil, metrics: RecipeDetailLayoutMetrics, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -260,17 +240,4 @@ private struct RecipeDetailLayoutMetrics {
     var sectionTitleSize: CGFloat { availableWidth < 360 ? 20 : 22 }
     var sectionSpacing: CGFloat { availableWidth < 360 ? 18 : 22 }
     var cardPadding: CGFloat { availableWidth < 360 ? 16 : 18 }
-}
-
-private struct StaticStarRatingView: View {
-    let rating: Int
-
-    var body: some View {
-        HStack(spacing: 4) {
-            ForEach(1...5, id: \.self) { index in
-                Image(systemName: index <= rating ? "star.fill" : "star")
-                    .foregroundStyle(index <= rating ? .yellow : .secondary)
-            }
-        }
-    }
 }

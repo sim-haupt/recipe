@@ -25,8 +25,7 @@ struct RemoteRecipeImage: View {
                 placeholder
             }
         }
-        .frame(height: height)
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, minHeight: height, maxHeight: height, alignment: .center)
         .clipped()
     }
 

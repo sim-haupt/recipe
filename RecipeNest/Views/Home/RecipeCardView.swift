@@ -4,6 +4,7 @@ struct RecipeCardView: View {
     let recipe: Recipe
     var imageHeight: CGFloat = 244
     var titleFontSize: CGFloat = 19
+    var favoriteAction: (() -> Void)?
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -18,23 +19,39 @@ struct RecipeCardView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
 
             VStack(alignment: .leading, spacing: 10) {
-                if let average = recipe.averageRating {
-                    HStack(spacing: 6) {
-                        Image(systemName: "star.fill")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(Color.yellow)
-                        Text(String(format: "%.1f", average))
-                            .font(.system(size: 12, weight: .bold, design: .rounded))
-                        if recipe.reviewCount > 0 {
-                            Text("(\(recipe.reviewCount))")
-                                .font(.system(size: 11, weight: .medium, design: .rounded))
-                                .foregroundStyle(RecipeTheme.textSecondary)
+                HStack(alignment: .top) {
+                    if let average = recipe.averageRating {
+                        HStack(spacing: 6) {
+                            Image(systemName: "star.fill")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(Color.yellow)
+                            Text(String(format: "%.1f", average))
+                                .font(.system(size: 12, weight: .bold, design: .rounded))
+                            if recipe.reviewCount > 0 {
+                                Text("(\(recipe.reviewCount))")
+                                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                                    .foregroundStyle(RecipeTheme.textSecondary)
+                            }
                         }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Color.white.opacity(0.92))
+                        .clipShape(Capsule())
                     }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(Color.white.opacity(0.92))
-                    .clipShape(Capsule())
+
+                    Spacer()
+
+                    if let favoriteAction {
+                        Button(action: favoriteAction) {
+                            Image(systemName: recipe.isFavorite ? "heart.fill" : "heart")
+                                .font(.system(size: 15, weight: .bold))
+                                .foregroundStyle(recipe.isFavorite ? Color.red : RecipeTheme.accentStrong)
+                                .frame(width: 34, height: 34)
+                                .background(Color.white.opacity(0.94))
+                                .clipShape(Circle())
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
 
                 Spacer()

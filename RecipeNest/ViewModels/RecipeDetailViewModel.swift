@@ -2,6 +2,7 @@ import Foundation
 
 @MainActor
 final class RecipeDetailViewModel: ObservableObject {
+    @Published var recipe: Recipe
     @Published var comments: [Comment] = []
     @Published var reviews: [Review] = []
     @Published var newComment = ""
@@ -11,7 +12,6 @@ final class RecipeDetailViewModel: ObservableObject {
     @Published var editableTags: [String]
     @Published var errorMessage: String?
 
-    let recipe: Recipe
     private let environment: AppEnvironment
     private let userProfile: UserProfile
     private var commentListener: RealtimeListening?
@@ -94,6 +94,18 @@ final class RecipeDetailViewModel: ObservableObject {
                 note: reviewNote,
                 author: userProfile
             )
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func toggleFavorite() async {
+        guard let householdID = userProfile.activeHouseholdID else { return }
+
+        do {
+            let nextValue = !recipe.isFavorite
+            try await environment.recipeService.updateFavorite(recipe: recipe, householdID: householdID, isFavorite: nextValue)
+            recipe.isFavorite = nextValue
         } catch {
             errorMessage = error.localizedDescription
         }

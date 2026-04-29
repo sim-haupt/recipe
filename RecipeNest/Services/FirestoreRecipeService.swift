@@ -98,6 +98,7 @@ final class FirestoreRecipeService: RecipeServicing {
             "updatedAt": Timestamp(date: now),
             "tagIDs": tags.map(\.id),
             "tagNames": tags.map(\.name),
+            "isFavorite": false,
             "averageRating": input.initialRating > 0 ? Double(input.initialRating) : NSNull(),
             "reviewCount": input.initialRating > 0 ? 1 : 0
         ])
@@ -130,6 +131,13 @@ final class FirestoreRecipeService: RecipeServicing {
         try await recipesCollection(householdID: householdID).document(recipe.id).setData([
             "tagIDs": tags.map(\.id),
             "tagNames": tags.map(\.name),
+            "updatedAt": Timestamp(date: Date())
+        ], merge: true)
+    }
+
+    func updateFavorite(recipe: Recipe, householdID: String, isFavorite: Bool) async throws {
+        try await recipesCollection(householdID: householdID).document(recipe.id).setData([
+            "isFavorite": isFavorite,
             "updatedAt": Timestamp(date: Date())
         ], merge: true)
     }
@@ -250,6 +258,7 @@ private func mapRecipe(_ document: QueryDocumentSnapshot) -> Recipe {
         updatedAt: (data["updatedAt"] as? Timestamp)?.dateValue() ?? Date(),
         tagIDs: data["tagIDs"] as? [String] ?? [],
         tagNames: data["tagNames"] as? [String] ?? [],
+        isFavorite: data["isFavorite"] as? Bool ?? false,
         averageRating: data["averageRating"] as? Double,
         reviewCount: data["reviewCount"] as? Int ?? 0
     )

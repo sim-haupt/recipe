@@ -71,6 +71,7 @@ final class DemoDataStore {
             updatedAt: now,
             tagIDs: tags.map(\.id),
             tagNames: tags.map(\.name),
+            isFavorite: true,
             averageRating: 4.0,
             reviewCount: 1
         )
