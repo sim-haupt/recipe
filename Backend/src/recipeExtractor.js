@@ -12,6 +12,10 @@ const SYSTEM_PROMPT = [
   "The scraped text may include navigation, related content, social captions, cookie text, or other page chrome.",
   "For Instagram, TikTok, reels, or other social posts, the useful recipe content may appear only in the caption or page description.",
   "When social captions contain ingredients or steps inline, extract them from dashed lines, numbered lines, emoji-prefixed lines, or short instruction sentences.",
+  "Social captions may be bilingual or duplicated in multiple languages. If the same recipe appears twice in different languages, merge it into one clean extraction instead of duplicating the recipe.",
+  "Treat section markers such as REZEPT, RECIPE, ZUTATEN, INGREDIENTS, Zum Zusammenbauen, To assemble, Preparation, Instructions, Notes, Tipps, or Tips as strong recipe structure hints.",
+  "Ignore engagement counts, hashtags, ad markers, creator mentions, discount codes, and conversational intro/outro text unless they contain actual recipe instructions, storage guidance, or ingredient details.",
+  "If a caption mixes German and English, extract the recipe normally. Do not reject or flatten the content just because it is multilingual.",
   "Prioritize recipe-specific content such as structured ingredients, instructions, and notes.",
   "Ignore unrelated page text, author bios, comment prompts, navigation labels, and legal/footer text.",
   "Do not invent ingredients, quantities, or steps that are not supported by the source.",
@@ -158,6 +162,11 @@ function buildUserPrompt(payload) {
   );
 
   return [
+    "Extraction guidance:",
+    "- Prefer the ingredient and step lines over any intro, ad, or commentary text.",
+    "- If the same recipe is repeated in two languages, keep one normalized set of ingredients and steps.",
+    "- Keep storage guidance or yield/prep-time details in notes, not in preparation steps.",
+    "- Do not return one giant paragraph as a single preparation step.",
     `Source URL: ${payload.sourceURL || ""}`,
     `Title: ${payload.title || ""}`,
     `Description: ${payload.description || ""}`,
