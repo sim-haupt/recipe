@@ -267,12 +267,14 @@ function extractPageText(html) {
 
 function normalizeRecipeCandidateText(value) {
   return decodeEntities(value || "")
+    .replace(/�/g, "\n")
     .replace(/\r\n/g, "\n")
     .replace(/\r/g, "\n")
     .replace(/\b(REZEPT|RECIPE)\b/gi, "\n$1")
     .replace(/\b(ZUTATEN|INGREDIENTS|INSTRUCTIONS|DIRECTIONS|METHOD|PREPARATION|NOTES|TIPPS|TIPS|TO ASSEMBLE|ZUM ZUSAMMENBAUEN)\b\s*:?/gi, "\n$&\n")
     .replace(/\s+-(?=\d|[A-Za-zÄÖÜäöü])/g, "\n-")
     .replace(/([.!?])\s+(?=(Add|Mix|Chop|Serve|Assemble|Cook|Bake|Fry|Heat|Stir|Whisk|Combine|Fold|Alles|Mit|Dann|Zum|Vermischen|Braten|Servieren|Zusammenbauen)\b)/gi, "$1\n")
+    .replace(/(?<=[A-Za-zÄÖÜäöü0-9])\s+(?=(Add|Mix|Chop|Serve|Assemble|Cook|Bake|Fry|Heat|Stir|Whisk|Combine|Fold|Alles|Mit|Dann|Zum|Vermischen|Braten|Servieren|Zusammenbauen)\b)/gi, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
@@ -414,6 +416,7 @@ function cleanRecipeLine(line) {
     (line || "")
       .replace(/^[-•]\s*/, "")
       .replace(/^\d+[\.\)]\s*/, "")
+      .replace(/^(recipe|rezept)\s*\([^)]*\)\s*:?/i, "")
       .trim(),
     360
   );
@@ -462,7 +465,7 @@ function heuristicExtractionFromRequest(request = {}) {
 
 function looksLikeIngredientLine(line) {
   const lower = line.toLowerCase();
-  if (lower.length > 180 || lower.includes("likes") || lower.includes("comments")) return false;
+  if (lower.length > 180 || lower.includes("likes") || lower.includes("comments") || lower.includes("@")) return false;
   return /^[-•]/.test(line)
     || /\b(\d+\/\d+|\d+(?:[.,]\d+)?)\s*(g|kg|ml|l|tbsp|tsp|el|tl|cup|cups|clove|cloves|dose|cans?)\b/i.test(line)
     || /\b(onion|garlic|ginger|chickpeas?|tomato paste|mayo|lemon juice|bread|lettuce|cucumber|zwiebel|knoblauch|ingwer|kichererbsen|tomatenmark|zitrone)\b/i.test(lower);
@@ -471,6 +474,7 @@ function looksLikeIngredientLine(line) {
 function looksLikePreparationLine(line) {
   const lower = line.toLowerCase();
   if (lower.length < 12 || lower.includes("likes") || lower.includes("comments")) return false;
+  if (lower.includes("recipe (") || lower.includes("rezept (")) return false;
   return /\b(add|mix|chop|serve|assemble|cook|bake|fry|heat|stir|whisk|combine|fold|marinate|vermischen|braten|servieren|zusammenbauen|klein schneiden|anbraten|belegen|genießen)\b/i.test(lower)
     || /^to assemble:?$/i.test(line);
 }
@@ -482,5 +486,8 @@ function shouldUseHeuristicIngredients(ingredients) {
 function shouldUseHeuristicPreparation(preparationSteps, heuristicIngredients) {
   if (preparationSteps.length === 0) return true;
   if (preparationSteps.length === 1 && preparationSteps[0].length > 260) return true;
+  if (preparationSteps.some((line) => /recipe\s*\(|rezept\s*\(|likes|comments|@/.test(line.toLowerCase()))) {
+    return true;
+  }
   return preparationSteps.every((line) => heuristicIngredients.includes(line));
 }

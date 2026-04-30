@@ -61,11 +61,65 @@ final class RecipeEnrichmentService: RecipeEnrichmentServicing {
         }
 
         let decoded = try JSONDecoder().decode(BackendRecipeEnrichmentResponse.self, from: data)
-        let extraction = decoded.asExtraction
+        let extraction = mergedExtraction(primary: decoded.asExtraction, fallback: fallback.enrichRecipeContent(using: request))
         guard extraction.hasMeaningfulContent else {
             throw RecipeEnrichmentError.invalidResponse
         }
         return extraction
+    }
+
+    private func mergedExtraction(primary: RecipeAIExtraction, fallback: RecipeAIExtraction) -> RecipeAIExtraction {
+        RecipeAIExtraction(
+            summary: primary.summary.isEmpty ? fallback.summary : primary.summary,
+            ingredients: shouldPreferFallbackIngredients(primary.ingredients, fallback: fallback.ingredients) ? fallback.ingredients : primary.ingredients,
+            preparationSteps: shouldPreferFallbackPreparation(primary.preparationSteps, fallback: fallback.preparationSteps) ? fallback.preparationSteps : primary.preparationSteps,
+            notes: shouldPreferFallbackNotes(primary.notes, fallback: fallback.notes) ? fallback.notes : primary.notes,
+            confidence: primary.confidence ?? fallback.confidence
+        )
+    }
+
+    private func shouldPreferFallbackIngredients(_ primary: [String], fallback: [String]) -> Bool {
+        if primary.isEmpty {
+            return !fallback.isEmpty
+        }
+
+        if primary.count <= 2 && fallback.count >= 4 {
+            return true
+        }
+
+        return primary.contains(where: isSuspiciousRecipeBlob)
+    }
+
+    private func shouldPreferFallbackPreparation(_ primary: [String], fallback: [String]) -> Bool {
+        if primary.isEmpty {
+            return !fallback.isEmpty
+        }
+
+        if primary.count == 1, let first = primary.first, first.count > 220 {
+            return !fallback.isEmpty
+        }
+
+        return primary.contains(where: isSuspiciousRecipeBlob) && !fallback.isEmpty
+    }
+
+    private func shouldPreferFallbackNotes(_ primary: [String], fallback: [String]) -> Bool {
+        primary.isEmpty && !fallback.isEmpty
+    }
+
+    private func isSuspiciousRecipeBlob(_ value: String) -> Bool {
+        let lowercased = value.lowercased()
+        if lowercased.contains("recipe (") || lowercased.contains("rezept (") {
+            return true
+        }
+        if lowercased.contains("likes") || lowercased.contains("comments") {
+            return true
+        }
+        if value.count > 260 {
+            return true
+        }
+
+        let dashedSegments = value.components(separatedBy: "-").count - 1
+        return dashedSegments >= 3
     }
 
     private static func configuredEndpointURL() -> URL? {

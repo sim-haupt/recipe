@@ -33,10 +33,12 @@ enum ImportedTextSanitizer {
         guard !cleaned.isEmpty else { return "" }
 
         let normalizedSections = cleaned
+            .replacingOccurrences(of: "�", with: "\n")
             .replacingOccurrences(of: #"(?i)\b(rezept|recipe)\b"#, with: "\n$1", options: .regularExpression)
             .replacingOccurrences(of: #"(?i)\b(zutaten|ingredients|instructions|directions|method|preparation|notes|tipps|tips|to assemble|zum zusammenbauen)\b\s*:?"#, with: "\n$0\n", options: .regularExpression)
             .replacingOccurrences(of: #"(?<=\S)\s+-(?=\d|[A-Za-zÄÖÜäöü])"#, with: "\n-", options: .regularExpression)
             .replacingOccurrences(of: #"([.!?])\s+(?=(Add|Mix|Chop|Serve|Assemble|Cook|Bake|Fry|Heat|Stir|Whisk|Combine|Fold|Alles|Mit|Dann|Zum|Vermischen|Braten|Backen|Servieren)\b)"#, with: "$1\n", options: .regularExpression)
+            .replacingOccurrences(of: #"(?<=[A-Za-zÄÖÜäöü0-9])\s+(?=(Add|Mix|Chop|Serve|Assemble|Cook|Bake|Fry|Heat|Stir|Whisk|Combine|Fold|Alles|Mit|Dann|Zum|Vermischen|Braten|Backen|Servieren)\b)"#, with: "\n", options: .regularExpression)
 
         return cleanMultiline(normalizedSections)
     }
