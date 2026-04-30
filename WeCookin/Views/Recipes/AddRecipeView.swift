@@ -45,6 +45,14 @@ struct AddRecipeView: View {
                 Section("Categories") {
                     CategorySelectionGrid(selectedCategories: $viewModel.draft.categories)
                 }
+
+                Section("Tags") {
+                    EditableTagEditor(
+                        tags: $viewModel.draft.tags,
+                        placeholder: "Add tags",
+                        helperText: viewModel.draft.tags.isEmpty ? "Tags are optional and will appear as hashtags on the recipe page." : nil
+                    )
+                }
             }
             .scrollContentBackground(.hidden)
             .background(RecipeTheme.pageGradient.ignoresSafeArea())
@@ -153,20 +161,8 @@ private struct CategorySelectionGrid: View {
                             selectedCategories.append(category)
                         }
                     } label: {
-                        Text(category)
-                            .font(.system(size: 13, weight: .semibold, design: .rounded))
-                            .foregroundStyle(RecipeCategory.color(for: category))
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 10)
+                        CategoryPill(title: category, isSelected: isSelected)
                             .frame(maxWidth: .infinity)
-                            .background(
-                                Capsule()
-                                    .fill(RecipeCategory.fillColor(for: category, isSelected: isSelected))
-                            )
-                            .overlay {
-                                Capsule()
-                                    .stroke(RecipeCategory.strokeColor(for: category, isSelected: isSelected), lineWidth: 1)
-                            }
                     }
                     .buttonStyle(.plain)
                 }

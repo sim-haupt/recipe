@@ -65,7 +65,7 @@ final class FirestoreHouseholdService: HouseholdServicing {
             .getDocuments()
 
         guard let document = snapshot.documents.first, let household = mapHousehold(document) else {
-            throw NSError(domain: "RecipeNest", code: 404, userInfo: [NSLocalizedDescriptionKey: "No household matches that invite code."])
+            throw NSError(domain: "WeCookin", code: 404, userInfo: [NSLocalizedDescriptionKey: "No household matches that invite code."])
         }
 
         try await document.reference.setData([

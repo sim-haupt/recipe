@@ -10,7 +10,7 @@ extension StorageReference {
                 } else if let metadata {
                     continuation.resume(returning: metadata)
                 } else {
-                    continuation.resume(throwing: NSError(domain: "RecipeNest", code: -1, userInfo: [NSLocalizedDescriptionKey: "Image upload finished without metadata."]))
+                    continuation.resume(throwing: NSError(domain: "WeCookin", code: -1, userInfo: [NSLocalizedDescriptionKey: "Image upload finished without metadata."]))
                 }
             }
         }
@@ -24,7 +24,7 @@ extension StorageReference {
                 } else if let url {
                     continuation.resume(returning: url)
                 } else {
-                    continuation.resume(throwing: NSError(domain: "RecipeNest", code: -2, userInfo: [NSLocalizedDescriptionKey: "Image upload finished without a download URL."]))
+                    continuation.resume(throwing: NSError(domain: "WeCookin", code: -2, userInfo: [NSLocalizedDescriptionKey: "Image upload finished without a download URL."]))
                 }
             }
         }

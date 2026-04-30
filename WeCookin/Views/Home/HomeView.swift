@@ -11,7 +11,9 @@ struct HomeView: View {
     @State private var allSearchText = ""
     @State private var favoriteSearchText = ""
     @State private var allSelectedCategories = Set<String>()
+    @State private var allSelectedTags = Set<String>()
     @State private var favoriteSelectedCategories = Set<String>()
+    @State private var favoriteSelectedTags = Set<String>()
     @State private var allMinimumRating = 0
     @State private var favoriteMinimumRating = 0
     @State private var isShowingFilterSheet = false
@@ -31,9 +33,10 @@ struct HomeView: View {
         let searched = viewModel.searchResults(in: baseRecipes, query: currentSearchText)
         return searched.filter { recipe in
             let matchesCategory = currentSelectedCategories.isEmpty || !Set(recipe.categories).isDisjoint(with: currentSelectedCategories)
+            let matchesTag = currentSelectedTags.isEmpty || !Set(recipe.tagNames).isDisjoint(with: currentSelectedTags)
             let rating = recipe.averageRating ?? 0
             let matchesRating = currentMinimumRating == 0 || rating >= Double(currentMinimumRating)
-            return matchesCategory && matchesRating
+            return matchesCategory && matchesTag && matchesRating
         }
     }
 
@@ -49,8 +52,12 @@ struct HomeView: View {
         selectedTab == .all ? allMinimumRating : favoriteMinimumRating
     }
 
+    private var currentSelectedTags: Set<String> {
+        selectedTab == .all ? allSelectedTags : favoriteSelectedTags
+    }
+
     private var currentFilterCount: Int {
-        currentSelectedCategories.count + (currentMinimumRating > 0 ? 1 : 0)
+        currentSelectedCategories.count + currentSelectedTags.count + (currentMinimumRating > 0 ? 1 : 0)
     }
 
     private var currentSearchBinding: Binding<String> {
@@ -87,6 +94,19 @@ struct HomeView: View {
                     allMinimumRating = newValue
                 } else {
                     favoriteMinimumRating = newValue
+                }
+            }
+        )
+    }
+
+    private var currentSelectedTagsBinding: Binding<Set<String>> {
+        Binding(
+            get: { selectedTab == .all ? allSelectedTags : favoriteSelectedTags },
+            set: { newValue in
+                if selectedTab == .all {
+                    allSelectedTags = newValue
+                } else {
+                    favoriteSelectedTags = newValue
                 }
             }
         )
@@ -181,8 +201,10 @@ struct HomeView: View {
             .sheet(isPresented: $isShowingFilterSheet) {
                 RecipeFilterSheet(
                     selectedCategories: currentSelectedCategoriesBinding,
+                    selectedTags: currentSelectedTagsBinding,
                     minimumRating: currentMinimumRatingBinding,
-                    availableCategories: RecipeCategory.allTitles
+                    availableCategories: RecipeCategory.allTitles,
+                    availableTags: availableTags
                 )
             }
             .task {
@@ -335,6 +357,11 @@ struct HomeView: View {
                 favoriteSelectedCategories.insert(category)
             }
         }
+    }
+
+    private var availableTags: [String] {
+        Array(Set(baseRecipes.flatMap(\.tagNames)))
+            .sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
     }
 }
 
@@ -629,22 +656,8 @@ private struct CategoryBadge: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(.system(size: 13, weight: .semibold, design: .rounded))
-                .foregroundStyle(RecipeCategory.color(for: title))
-                .padding(.horizontal, 14)
-                .padding(.vertical, 9)
-                .background(
-                    Capsule()
-                        .fill(RecipeCategory.fillColor(for: title, isSelected: isSelected))
-                )
-                .overlay {
-                    Capsule()
-                        .stroke(RecipeCategory.strokeColor(for: title, isSelected: isSelected), lineWidth: 1)
-                }
-        }
-        .buttonStyle(PressableScaleButtonStyle())
+        CategoryPill(title: title, isSelected: isSelected, style: .outlined, action: action)
+            .buttonStyle(PressableScaleButtonStyle())
     }
 }
 
@@ -652,19 +665,7 @@ struct RecipeTagPill: View {
     let title: String
 
     var body: some View {
-        Text(title)
-            .font(.system(size: 11, weight: .semibold, design: .rounded))
-            .foregroundStyle(RecipeCategory.color(for: title))
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(
-                Capsule()
-                    .fill(RecipeCategory.fillColor(for: title, isSelected: true))
-            )
-            .overlay {
-                Capsule()
-                    .stroke(RecipeCategory.strokeColor(for: title, isSelected: true), lineWidth: 1)
-            }
+        CategoryPill(title: title, compact: true)
     }
 }
 
@@ -714,9 +715,11 @@ private struct HomeEmptyCard: View {
 private struct RecipeFilterSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Binding var selectedCategories: Set<String>
+    @Binding var selectedTags: Set<String>
     @Binding var minimumRating: Int
 
     let availableCategories: [String]
+    let availableTags: [String]
 
     var body: some View {
         NavigationStack {
@@ -744,6 +747,17 @@ private struct RecipeFilterSheet: View {
                             ratingChip(value: 5, label: "5")
                         }
                     }
+
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Tags")
+                            .font(.system(size: 17, weight: .bold, design: .rounded))
+
+                        if availableTags.isEmpty {
+                            HomeEmptyCard(message: "Tags will appear here once recipes are tagged.")
+                        } else {
+                            AdaptiveTagGrid(tags: availableTags, selectedTags: $selectedTags)
+                        }
+                    }
                 }
                 .padding(20)
             }
@@ -752,6 +766,7 @@ private struct RecipeFilterSheet: View {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Reset") {
                         selectedCategories.removeAll()
+                        selectedTags.removeAll()
                         minimumRating = 0
                     }
                     .foregroundStyle(RecipeTheme.accentStrong)
@@ -819,6 +834,25 @@ private struct AdaptiveCategoryGrid: View {
                         }
                     }
                 )
+            }
+        }
+    }
+}
+
+private struct AdaptiveTagGrid: View {
+    let tags: [String]
+    @Binding var selectedTags: Set<String>
+
+    var body: some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 112), spacing: 10)], alignment: .leading, spacing: 10) {
+            ForEach(tags, id: \.self) { tag in
+                TagChip(title: "#\(tag)", isSelected: selectedTags.contains(tag)) {
+                    if selectedTags.contains(tag) {
+                        selectedTags.remove(tag)
+                    } else {
+                        selectedTags.insert(tag)
+                    }
+                }
             }
         }
     }

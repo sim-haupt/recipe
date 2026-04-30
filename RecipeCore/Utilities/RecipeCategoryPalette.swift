@@ -39,4 +39,16 @@ extension RecipeCategory {
     static func strokeColor(for title: String, isSelected: Bool) -> Color {
         isSelected ? color(for: title).opacity(0.42) : color(for: title).opacity(0.22)
     }
+
+    static func gradient(for title: String) -> LinearGradient {
+        let base = color(for: title)
+        return LinearGradient(
+            colors: [
+                base.opacity(0.82),
+                base
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
 }

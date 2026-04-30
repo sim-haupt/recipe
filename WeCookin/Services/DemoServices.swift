@@ -32,7 +32,7 @@ final class DemoAuthService: AuthServicing {
             store.saveSnapshotIfPossible()
             store.notifyAuthObservers()
         } else {
-            throw NSError(domain: "RecipeNestDemo", code: 401, userInfo: [NSLocalizedDescriptionKey: "Demo mode could not find that user."])
+            throw NSError(domain: "WeCookinDemo", code: 401, userInfo: [NSLocalizedDescriptionKey: "Demo mode could not find that user."])
         }
     }
 
@@ -118,7 +118,7 @@ final class DemoHouseholdService: HouseholdServicing {
 
     func joinHousehold(inviteCode: String, user: UserProfile) async throws -> Household {
         guard let household = store.households.values.first(where: { $0.inviteCode.caseInsensitiveCompare(inviteCode) == .orderedSame }) else {
-            throw NSError(domain: "RecipeNestDemo", code: 404, userInfo: [NSLocalizedDescriptionKey: "No demo household matches that invite code."])
+            throw NSError(domain: "WeCookinDemo", code: 404, userInfo: [NSLocalizedDescriptionKey: "No demo household matches that invite code."])
         }
 
         var updatedHousehold = household

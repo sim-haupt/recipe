@@ -78,7 +78,7 @@ final class DemoDataStore {
         let user = UserProfile(
             id: userID,
             displayName: "Demo Cook",
-            email: "demo@recipenest.local",
+            email: "demo@wecookin.local",
             activeHouseholdID: householdID,
             householdIDs: [householdID],
             createdAt: now,
@@ -181,10 +181,10 @@ final class DemoDataStore {
     private func imageDirectoryURL() throws -> URL {
         let fileManager = FileManager.default
         guard let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
-            throw NSError(domain: "RecipeNestDemo", code: 500, userInfo: [NSLocalizedDescriptionKey: "Could not access local image storage."])
+            throw NSError(domain: "WeCookinDemo", code: 500, userInfo: [NSLocalizedDescriptionKey: "Could not access local image storage."])
         }
 
-        let directory = appSupport.appendingPathComponent("RecipeNestDemoImages", isDirectory: true)
+        let directory = appSupport.appendingPathComponent("WeCookinDemoImages", isDirectory: true)
         try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
         return directory
     }
@@ -192,10 +192,10 @@ final class DemoDataStore {
     private func snapshotFileURL() throws -> URL {
         let fileManager = FileManager.default
         guard let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
-            throw NSError(domain: "RecipeNestDemo", code: 500, userInfo: [NSLocalizedDescriptionKey: "Could not access demo storage."])
+            throw NSError(domain: "WeCookinDemo", code: 500, userInfo: [NSLocalizedDescriptionKey: "Could not access demo storage."])
         }
 
-        let directory = appSupport.appendingPathComponent("RecipeNestDemoStore", isDirectory: true)
+        let directory = appSupport.appendingPathComponent("WeCookinDemoStore", isDirectory: true)
         try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
         return directory.appendingPathComponent("snapshot.json")
     }

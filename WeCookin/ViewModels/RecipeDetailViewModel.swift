@@ -8,6 +8,7 @@ final class RecipeDetailViewModel: ObservableObject {
     @Published var newComment = ""
     @Published var reviewRating = 0
     @Published var editableCategories = Set<String>()
+    @Published var editableTags: [String]
     @Published var editTitle: String
     @Published var editDescription: String
     @Published var editSourceURL: String
@@ -24,6 +25,7 @@ final class RecipeDetailViewModel: ObservableObject {
         self.environment = environment
         self.userProfile = userProfile
         self.editableCategories = Set(recipe.categories)
+        self.editableTags = recipe.tagNames
         self.editTitle = recipe.title
         self.editDescription = recipe.description
         self.editSourceURL = recipe.sourceURL ?? ""
@@ -42,6 +44,7 @@ final class RecipeDetailViewModel: ObservableObject {
                     self.editDescription = updatedRecipe.description
                     self.editSourceURL = updatedRecipe.sourceURL ?? ""
                     self.editableCategories = Set(updatedRecipe.categories)
+                    self.editableTags = updatedRecipe.tagNames
                 case .failure(let error):
                     self?.errorMessage = error.localizedDescription
                 }
@@ -127,7 +130,7 @@ final class RecipeDetailViewModel: ObservableObject {
                 description: editDescription,
                 sourceURL: editSourceURL,
                 categories: editableCategories.sorted(),
-                tagNames: recipe.tagNames,
+                tagNames: editableTags,
                 imageData: imageData
             )
 
@@ -135,6 +138,7 @@ final class RecipeDetailViewModel: ObservableObject {
             recipe.description = editDescription
             recipe.sourceURL = editSourceURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : editSourceURL.trimmingCharacters(in: .whitespacesAndNewlines)
             recipe.categories = editableCategories.sorted()
+            recipe.tagNames = editableTags
         } catch {
             errorMessage = error.localizedDescription
         }

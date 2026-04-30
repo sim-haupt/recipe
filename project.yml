@@ -1,4 +1,4 @@
-name: RecipeNest
+name: WeCookin
 options:
   bundleIdPrefix: com.example
   deploymentTarget:
@@ -8,16 +8,16 @@ packages:
     url: https://github.com/firebase/firebase-ios-sdk.git
     from: 10.24.0
 targets:
-  RecipeNest:
+  WeCookin:
     type: application
     platform: iOS
     sources:
-      - path: RecipeNest
+      - path: WeCookin
       - path: RecipeCore
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.recipenest
-        PRODUCT_NAME: RecipeNest
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.wecookin
+        PRODUCT_NAME: WeCookin
         SWIFT_VERSION: 5.10
         INFOPLIST_KEY_CFBundleName: "WeCookin'"
         INFOPLIST_KEY_CFBundleDisplayName: "WeCookin'"
@@ -27,11 +27,11 @@ targets:
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.food-and-drink
         INFOPLIST_KEY_CFBundleURLTypes:
           - CFBundleURLSchemes:
-              - recipenest
-        DEVELOPMENT_ASSET_PATHS: "\"RecipeNest/Preview Content\""
+              - wecookin
+        DEVELOPMENT_ASSET_PATHS: "\"WeCookin/Preview Content\""
         TARGETED_DEVICE_FAMILY: 1
         IPHONEOS_DEPLOYMENT_TARGET: 17.0
-        CODE_SIGN_ENTITLEMENTS: Config/RecipeNest.entitlements
+        CODE_SIGN_ENTITLEMENTS: Config/WeCookin.entitlements
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
     dependencies:
       - package: Firebase
@@ -40,15 +40,15 @@ targets:
         product: FirebaseFirestore
       - package: Firebase
         product: FirebaseStorage
-      - target: RecipeNestShareExtension
+      - target: WeCookinShareExtension
         embed: true
     info:
-      path: Config/RecipeNest-Info.plist
+      path: Config/WeCookin-Info.plist
       properties:
         UIApplicationSupportsMultipleScenes: false
         UILaunchScreen:
           UIImageName: ""
-  RecipeNestShareExtension:
+  WeCookinShareExtension:
     type: app-extension
     platform: iOS
     sources:
@@ -56,16 +56,16 @@ targets:
       - path: RecipeCore
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.recipenest.share
-        PRODUCT_NAME: RecipeNestShareExtension
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.wecookin.share
+        PRODUCT_NAME: WeCookinShareExtension
         SWIFT_VERSION: 5.10
         INFOPLIST_KEY_CFBundleName: "WeCookin'"
         IPHONEOS_DEPLOYMENT_TARGET: 17.0
-        CODE_SIGN_ENTITLEMENTS: Config/RecipeNestShareExtension.entitlements
+        CODE_SIGN_ENTITLEMENTS: Config/WeCookinShareExtension.entitlements
         SKIP_INSTALL: true
         TARGETED_DEVICE_FAMILY: 1
     info:
-      path: Config/RecipeNestShareExtension-Info.plist
+      path: Config/WeCookinShareExtension-Info.plist
       properties:
         CFBundleDisplayName: "Save to WeCookin'"
         NSExtension:
@@ -81,8 +81,8 @@ targets:
           NSExtensionPointIdentifier: com.apple.share-services
           NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareViewController
 schemes:
-  RecipeNest:
+  WeCookin:
     build:
       targets:
-        RecipeNest: all
-        RecipeNestShareExtension: all
+        WeCookin: all
+        WeCookinShareExtension: all

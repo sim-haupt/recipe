@@ -246,17 +246,7 @@ struct RecipeDetailView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         ForEach(viewModel.recipe.categories, id: \.self) { category in
-                            Text(category)
-                                .font(.system(size: 12, weight: .semibold, design: .rounded))
-                                .foregroundStyle(RecipeCategory.color(for: category))
-                                .padding(.horizontal, 11)
-                                .padding(.vertical, 7)
-                                .background(Color.white.opacity(0.92))
-                                .clipShape(Capsule())
-                                .overlay {
-                                    Capsule()
-                                        .stroke(RecipeCategory.strokeColor(for: category, isSelected: true), lineWidth: 1)
-                                }
+                            CategoryPill(title: category, compact: true)
                         }
                     }
                 }
@@ -405,24 +395,21 @@ struct RecipeDetailView: View {
                                     viewModel.editableCategories.insert(category)
                                 }
                             } label: {
-                                Text(category)
-                                    .font(.system(size: 13, weight: .semibold, design: .rounded))
-                                    .foregroundStyle(RecipeCategory.color(for: category))
-                                    .padding(.horizontal, 14)
-                                    .padding(.vertical, 10)
+                                CategoryPill(title: category, isSelected: isSelected, style: .outlined)
                                     .frame(maxWidth: .infinity)
-                                    .background(
-                                        Capsule()
-                                            .fill(RecipeCategory.fillColor(for: category, isSelected: isSelected))
-                                    )
-                                    .overlay {
-                                        Capsule()
-                                            .stroke(RecipeCategory.strokeColor(for: category, isSelected: isSelected), lineWidth: 1)
-                                    }
                             }
                             .buttonStyle(.plain)
                         }
                     }
+
+                    Text("Tags")
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+
+                    EditableTagEditor(
+                        tags: $viewModel.editableTags,
+                        placeholder: "Add tags",
+                        helperText: "Tags appear as hashtags on the recipe page."
+                    )
                 }
                 .padding(20)
             }

@@ -2,7 +2,7 @@ import Foundation
 import SwiftUI
 
 @main
-struct RecipeNestApp: App {
+struct WeCookinApp: App {
     private let environment: AppEnvironment
     @StateObject private var sessionViewModel: SessionViewModel
 

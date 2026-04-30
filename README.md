@@ -1,6 +1,6 @@
-# RecipeNest
+# WeCookin
 
-RecipeNest is a SwiftUI iPhone app for saving recipes from websites, Instagram posts, and other apps through the iOS Share Sheet. This starter focuses on an MVP with Firebase Authentication, Cloud Firestore, a shared household model, and a Share Extension that saves import drafts into an App Group for the main app to ingest.
+WeCookin is a SwiftUI iPhone app for saving recipes from websites, Instagram posts, and other apps through the iOS Share Sheet. This starter focuses on an MVP with Firebase Authentication, Cloud Firestore, a shared household model, and a Share Extension that saves import drafts into an App Group for the main app to ingest.
 
 ## What is included
 
@@ -16,7 +16,7 @@ RecipeNest is a SwiftUI iPhone app for saving recipes from websites, Instagram p
 ## Project structure
 
 ```text
-RecipeNest/
+WeCookin/
 ├── project.yml
 ├── Config/
 ├── Docs/
@@ -25,7 +25,7 @@ RecipeNest/
 │   ├── Models/
 │   ├── Services/
 │   └── Utilities/
-├── RecipeNest/
+├── WeCookin/
 │   ├── App/
 │   ├── Assets.xcassets/
 │   ├── Design/
@@ -38,7 +38,7 @@ RecipeNest/
 ## Architecture
 
 - `RecipeCore` contains shared models and share-import storage used by both targets.
-- `RecipeNest` contains the SwiftUI app, view models, theme, and Firebase-backed services.
+- `WeCookin` contains the SwiftUI app, view models, theme, and Firebase-backed services.
 - `ShareExtension` contains the UIKit host controller and SwiftUI import flow for the Share Extension.
 - Firestore is the source of truth for households, recipes, comments, reviews, and tags.
 - The Share Extension saves a `RecipeDraft` into the shared App Group container. The main app imports those pending drafts into Firestore when the home screen starts.
@@ -47,11 +47,11 @@ RecipeNest/
 
 1. Install [XcodeGen](https://github.com/yonaskolb/XcodeGen) if you do not already have it.
 2. Open [project.yml](/Users/szy/Documents/GitHub/recipe/project.yml) and replace:
-   - `com.example.recipenest`
-   - `group.com.example.recipenest`
+   - `com.example.wecookin`
+   - `group.com.example.wecookin`
 3. Create a Firebase project.
 4. Add an iOS app in Firebase for the main app bundle identifier.
-5. Download `GoogleService-Info.plist` and add it to the `RecipeNest` app target in Xcode.
+5. Download `GoogleService-Info.plist` and add it to the `WeCookin` app target in Xcode.
 6. In Firebase Console, enable:
    - Authentication with Email/Password
    - Cloud Firestore
@@ -65,7 +65,7 @@ RecipeNest/
 xcodegen generate
 ```
 
-9. Open `RecipeNest.xcodeproj`.
+9. Open `WeCookin.xcodeproj`.
 10. Add a second Firebase app entry only if you decide later to use Firebase directly inside the Share Extension. The current MVP does not require that.
 11. Build and run the main app once to create a user account.
 12. In the simulator or on-device, enable the Share Extension in the iOS Share Sheet if it does not appear automatically under “More”.
