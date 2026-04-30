@@ -234,6 +234,10 @@ struct RecipeDetailView: View {
                     metrics: metrics,
                     usesNumbers: false
                 )
+
+                if !viewModel.recipe.preparationSteps.isEmpty || !viewModel.recipe.aiNotes.isEmpty {
+                    Divider()
+                }
             }
 
             if !viewModel.recipe.preparationSteps.isEmpty {
@@ -243,6 +247,10 @@ struct RecipeDetailView: View {
                     metrics: metrics,
                     usesNumbers: true
                 )
+
+                if !viewModel.recipe.aiNotes.isEmpty {
+                    Divider()
+                }
             }
 
             if !viewModel.recipe.aiNotes.isEmpty {
@@ -446,7 +454,12 @@ struct RecipeDetailView: View {
                         .recipeInputFieldStyle()
 
                     TextField("Description", text: $viewModel.editDescription, axis: .vertical)
-                        .recipeInputFieldStyle(minHeight: 120)
+                        .recipeInputFieldStyle(minHeight: 110)
+
+                    TextField("Source URL", text: $viewModel.editSourceURL, axis: .vertical)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .recipeInputFieldStyle(minHeight: 70)
 
                     Text("Categories")
                         .font(.system(size: 15, weight: .bold, design: .rounded))
@@ -476,6 +489,24 @@ struct RecipeDetailView: View {
                         placeholder: "Add tags",
                         helperText: "Tags appear as hashtags on the recipe page."
                     )
+
+                    Text("Ingredients")
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+
+                    TextField("One ingredient per line", text: $viewModel.editIngredients, axis: .vertical)
+                        .recipeInputFieldStyle(minHeight: 150)
+
+                    Text("Preparation")
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+
+                    TextField("One step per line", text: $viewModel.editPreparation, axis: .vertical)
+                        .recipeInputFieldStyle(minHeight: 170)
+
+                    Text("Notes")
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+
+                    TextField("Extra notes, tips, or substitutions", text: $viewModel.editNotes, axis: .vertical)
+                        .recipeInputFieldStyle(minHeight: 120)
                 }
                 .padding(20)
             }

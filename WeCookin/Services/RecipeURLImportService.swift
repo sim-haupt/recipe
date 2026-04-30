@@ -48,12 +48,16 @@ final class RecipeURLImportService: RecipeURLImportServicing {
             linkMetadata?.title,
             fallbackTitle(from: resolvedURL)
         ]) ?? "Imported Recipe"
-        let description = firstNonEmpty([
+        let descriptionSource = firstNonEmpty([
             htmlMetadata?.openGraphDescription,
             htmlMetadata?.twitterDescription,
             htmlMetadata?.metaDescription
         ]) ?? ""
-        let rawText = htmlMetadata?.bodyText ?? ""
+        let description = ImportedTextSanitizer.oneSentenceSummary(
+            from: descriptionSource,
+            fallback: htmlMetadata?.bodyText ?? ""
+        )
+        let rawText = ImportedTextSanitizer.cleanMultiline(htmlMetadata?.bodyText ?? "")
 
         let imageData = await fetchImageData(
             provider: linkMetadata?.imageProvider,
@@ -62,7 +66,7 @@ final class RecipeURLImportService: RecipeURLImportServicing {
 
         return RecipeURLImportResult(
             canonicalURL: resolvedURL.absoluteString,
-            title: title,
+            title: ImportedTextSanitizer.cleanInline(title),
             description: description,
             rawText: rawText,
             imageData: imageData
@@ -139,10 +143,10 @@ final class RecipeURLImportService: RecipeURLImportServicing {
     }
 
     private func fallbackTitle(from url: URL) -> String {
-        url.host?
+        ImportedTextSanitizer.cleanInline(url.host?
             .replacingOccurrences(of: "www.", with: "")
             .replacingOccurrences(of: ".", with: " ")
-            .capitalized ?? "Imported Recipe"
+            .capitalized ?? "Imported Recipe")
     }
 
     private func firstNonEmpty(_ values: [String?]) -> String? {
@@ -207,14 +211,7 @@ private struct HTMLMetadata {
     }
 
     private static func decodeHTMLEntities(_ string: String) -> String {
-        string
-            .replacingOccurrences(of: "&amp;", with: "&")
-            .replacingOccurrences(of: "&quot;", with: "\"")
-            .replacingOccurrences(of: "&#39;", with: "'")
-            .replacingOccurrences(of: "&apos;", with: "'")
-            .replacingOccurrences(of: "&lt;", with: "<")
-            .replacingOccurrences(of: "&gt;", with: ">")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        ImportedTextSanitizer.cleanInline(string)
     }
 
     private static func extractBodyText(from html: String) -> String {
@@ -232,9 +229,9 @@ private struct HTMLMetadata {
             .map { $0.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression).trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
 
-        return normalizedLines
+        return ImportedTextSanitizer.cleanMultiline(normalizedLines
             .prefix(140)
-            .joined(separator: "\n")
+            .joined(separator: "\n"))
     }
 }
 
@@ -315,7 +312,11 @@ final class RecipeEnrichmentService: RecipeEnrichmentServicing {
 
 private final class HeuristicRecipeEnrichmentService {
     func enrichRecipeContent(using request: RecipeEnrichmentRequest) -> RecipeAIExtraction {
-        let summary = request.description.trimmingCharacters(in: .whitespacesAndNewlines)
+        let summary = ImportedTextSanitizer.preferredRecipeDescription(
+            baseDescription: request.description,
+            rawText: request.rawText,
+            aiSummary: nil
+        )
         let rawLines = request.rawText
             .components(separatedBy: .newlines)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }

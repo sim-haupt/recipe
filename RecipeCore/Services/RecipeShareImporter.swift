@@ -23,8 +23,9 @@ final class RecipeShareImporter {
 
         for item in extensionItems {
             if let attributedContent = item.attributedContentText?.string, !attributedContent.isEmpty {
-                description = append(description, with: attributedContent)
-                rawText = append(rawText, with: attributedContent)
+                let cleanedContent = ImportedTextSanitizer.cleanMultiline(attributedContent)
+                description = append(description, with: cleanedContent)
+                rawText = append(rawText, with: cleanedContent)
             }
 
             if let attachments = item.attachments {
@@ -34,12 +35,13 @@ final class RecipeShareImporter {
                     }
 
                     if title.isEmpty, let text = await loadText(from: provider) {
+                        let cleanedText = ImportedTextSanitizer.cleanMultiline(text)
                         if description.isEmpty {
-                            description = text
+                            description = cleanedText
                         } else {
-                            title = inferTitle(from: text)
+                            title = inferTitle(from: cleanedText)
                         }
-                        rawText = append(rawText, with: text)
+                        rawText = append(rawText, with: cleanedText)
                     }
 
                     if imageData == nil, let data = await loadImageData(from: provider) {
@@ -58,15 +60,15 @@ final class RecipeShareImporter {
 
             if let remoteTitle = remoteMetadata?.bestTitle,
                (title.isEmpty || isLikelyFallbackTitle(title, for: sharedSourceURL)) {
-                title = remoteTitle
+                title = ImportedTextSanitizer.cleanInline(remoteTitle)
             }
 
             if let remoteDescription = remoteMetadata?.bestDescription, description.isEmpty {
-                description = remoteDescription
+                description = ImportedTextSanitizer.oneSentenceSummary(from: remoteDescription, fallback: "")
             }
 
             if let remoteRawText = remoteMetadata?.rawText, !remoteRawText.isEmpty {
-                rawText = append(rawText, with: remoteRawText)
+                rawText = append(rawText, with: ImportedTextSanitizer.cleanMultiline(remoteRawText))
             }
 
             if imageData == nil {
@@ -91,6 +93,14 @@ final class RecipeShareImporter {
             metadata["sourceURL"] = sourceURL
         }
 
+        title = ImportedTextSanitizer.cleanInline(title)
+        description = ImportedTextSanitizer.preferredRecipeDescription(
+            baseDescription: description,
+            rawText: rawText,
+            aiSummary: nil
+        )
+        rawText = ImportedTextSanitizer.cleanMultiline(rawText)
+
         return ImportedSharePayload(
             title: title,
             description: description,
@@ -102,7 +112,7 @@ final class RecipeShareImporter {
     }
 
     private func inferTitle(from text: String) -> String {
-        text
+        ImportedTextSanitizer.cleanMultiline(text)
             .split(whereSeparator: \.isNewline)
             .map(String.init)
             .first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })?
@@ -132,8 +142,11 @@ final class RecipeShareImporter {
     }
 
     private func append(_ existing: String, with newValue: String) -> String {
-        if existing.isEmpty { return newValue }
-        return existing + "\n\n" + newValue
+        let cleanedValue = ImportedTextSanitizer.cleanMultiline(newValue)
+        guard !cleanedValue.isEmpty else { return existing }
+        if existing.isEmpty { return cleanedValue }
+        if existing.contains(cleanedValue) { return existing }
+        return existing + "\n\n" + cleanedValue
     }
 
     private func fetchRemoteMetadata(from url: URL) async -> RemoteMetadata? {

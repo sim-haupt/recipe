@@ -190,13 +190,18 @@ final class DemoRecipeService: RecipeServicing {
         let recipeID = UUID().uuidString
         let imageURL = try input.imageData.map { try store.persistImageData($0, fileName: recipeID) }
         let extraction = input.aiExtraction?.hasMeaningfulContent == true ? input.aiExtraction : nil
-        let description = input.description.isEmpty ? (extraction?.summary ?? "") : input.description
+        let description = ImportedTextSanitizer.preferredRecipeDescription(
+            baseDescription: input.description,
+            rawText: (extraction?.ingredients ?? []).joined(separator: "\n"),
+            aiSummary: extraction?.summary
+        )
+        let cleanedTitle = ImportedTextSanitizer.cleanInline(input.title)
 
         var recipes = store.recipesByHousehold[householdID] ?? []
         let recipe = Recipe(
             id: recipeID,
             householdID: householdID,
-            title: input.title.isEmpty ? "Untitled Recipe" : input.title,
+            title: cleanedTitle.isEmpty ? "Untitled Recipe" : cleanedTitle,
             description: description,
             sourceURL: input.sourceURL.isEmpty ? nil : input.sourceURL,
             imageURL: imageURL,
@@ -245,17 +250,33 @@ final class DemoRecipeService: RecipeServicing {
         store.notifyTags(householdID: householdID)
     }
 
-    func updateRecipe(recipe: Recipe, householdID: String, title: String, description: String, sourceURL: String, categories: [String], tagNames: [String], imageData: Data?) async throws {
+    func updateRecipe(
+        recipe: Recipe,
+        householdID: String,
+        title: String,
+        description: String,
+        sourceURL: String,
+        categories: [String],
+        tagNames: [String],
+        ingredients: [String],
+        preparationSteps: [String],
+        notes: [String],
+        imageData: Data?
+    ) async throws {
         let tags = ensureTags(tagNames: tagNames, householdID: householdID)
         guard var recipes = store.recipesByHousehold[householdID],
               let index = recipes.firstIndex(where: { $0.id == recipe.id }) else { return }
 
-        recipes[index].title = title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? recipe.title : title.trimmingCharacters(in: .whitespacesAndNewlines)
-        recipes[index].description = description
+        let cleanedTitle = ImportedTextSanitizer.cleanInline(title)
+        recipes[index].title = cleanedTitle.isEmpty ? recipe.title : cleanedTitle
+        recipes[index].description = ImportedTextSanitizer.cleanInline(description)
         recipes[index].sourceURL = sourceURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : sourceURL.trimmingCharacters(in: .whitespacesAndNewlines)
         recipes[index].categories = categories
         recipes[index].tagIDs = tags.map(\.id)
         recipes[index].tagNames = tags.map(\.name)
+        recipes[index].ingredients = ingredients
+        recipes[index].preparationSteps = preparationSteps
+        recipes[index].aiNotes = notes
         if let imageData {
             recipes[index].imageURL = try store.persistImageData(imageData, fileName: recipe.id)
         }

@@ -85,10 +85,15 @@ final class AddRecipeViewModel: ObservableObject {
             }
 
             let enrichment = await fetchAIExtractionIfPossible()
+            let finalDescription = ImportedTextSanitizer.preferredRecipeDescription(
+                baseDescription: draft.description.trimmingCharacters(in: .whitespacesAndNewlines),
+                rawText: importedRawText.trimmingCharacters(in: .whitespacesAndNewlines),
+                aiSummary: enrichment?.summary
+            )
 
             let input = RecipeCreationInput(
                 title: draft.title.trimmingCharacters(in: .whitespacesAndNewlines),
-                description: draft.description.trimmingCharacters(in: .whitespacesAndNewlines),
+                description: finalDescription,
                 sourceURL: draft.sourceURL.trimmingCharacters(in: .whitespacesAndNewlines),
                 categories: draft.categories,
                 tagNames: draft.tags,

@@ -85,12 +85,17 @@ final class FirestoreRecipeService: RecipeServicing {
         let tags = try await ensureTags(tagNames: input.tagNames, householdID: householdID)
         let imageURL = try await uploadImageIfNeeded(input.imageData, householdID: householdID, recipeID: recipeID)
         let extraction = input.aiExtraction?.hasMeaningfulContent == true ? input.aiExtraction : nil
-        let description = input.description.isEmpty ? (extraction?.summary ?? "") : input.description
+        let description = ImportedTextSanitizer.preferredRecipeDescription(
+            baseDescription: input.description,
+            rawText: (extraction?.ingredients ?? []).joined(separator: "\n"),
+            aiSummary: extraction?.summary
+        )
+        let cleanedTitle = ImportedTextSanitizer.cleanInline(input.title)
 
         let recipeRef = recipesCollection(householdID: householdID).document(recipeID)
         var payload: [String: Any] = [
             "householdID": householdID,
-            "title": input.title,
+            "title": cleanedTitle.isEmpty ? "Untitled Recipe" : cleanedTitle,
             "description": description,
             "savedDate": Timestamp(date: now),
             "createdByUserID": author.id,
@@ -147,17 +152,33 @@ final class FirestoreRecipeService: RecipeServicing {
         ], merge: true)
     }
 
-    func updateRecipe(recipe: Recipe, householdID: String, title: String, description: String, sourceURL: String, categories: [String], tagNames: [String], imageData: Data?) async throws {
+    func updateRecipe(
+        recipe: Recipe,
+        householdID: String,
+        title: String,
+        description: String,
+        sourceURL: String,
+        categories: [String],
+        tagNames: [String],
+        ingredients: [String],
+        preparationSteps: [String],
+        notes: [String],
+        imageData: Data?
+    ) async throws {
         let tags = try await ensureTags(tagNames: tagNames, householdID: householdID)
         let imageURL = try await uploadImageIfNeeded(imageData, householdID: householdID, recipeID: recipe.id)
+        let cleanedTitle = ImportedTextSanitizer.cleanInline(title)
         var payload: [String: Any] = [
-            "title": title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? recipe.title : title.trimmingCharacters(in: .whitespacesAndNewlines),
-            "description": description,
+            "title": cleanedTitle.isEmpty ? recipe.title : cleanedTitle,
+            "description": ImportedTextSanitizer.cleanInline(description),
             "sourceURL": sourceURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? NSNull() : sourceURL.trimmingCharacters(in: .whitespacesAndNewlines),
             "category": categories.first ?? NSNull(),
             "categories": categories,
             "tagIDs": tags.map(\.id),
             "tagNames": tags.map(\.name),
+            "ingredients": ingredients,
+            "preparationSteps": preparationSteps,
+            "aiNotes": notes,
             "updatedAt": Timestamp(date: Date())
         ]
         if let imageURL {

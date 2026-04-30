@@ -38,7 +38,19 @@ protocol RecipeServicing {
     func observeComments(householdID: String, recipeID: String, onChange: @escaping (Result<[Comment], Error>) -> Void) -> RealtimeListening
     func observeReviews(householdID: String, recipeID: String, onChange: @escaping (Result<[Review], Error>) -> Void) -> RealtimeListening
     func createRecipe(input: RecipeCreationInput, householdID: String, author: UserProfile) async throws
-    func updateRecipe(recipe: Recipe, householdID: String, title: String, description: String, sourceURL: String, categories: [String], tagNames: [String], imageData: Data?) async throws
+    func updateRecipe(
+        recipe: Recipe,
+        householdID: String,
+        title: String,
+        description: String,
+        sourceURL: String,
+        categories: [String],
+        tagNames: [String],
+        ingredients: [String],
+        preparationSteps: [String],
+        notes: [String],
+        imageData: Data?
+    ) async throws
     func deleteRecipe(recipe: Recipe, householdID: String) async throws
     func updateTags(recipe: Recipe, householdID: String, tagNames: [String]) async throws
     func updateFavorite(recipe: Recipe, householdID: String, isFavorite: Bool) async throws

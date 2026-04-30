@@ -12,6 +12,9 @@ final class RecipeDetailViewModel: ObservableObject {
     @Published var editTitle: String
     @Published var editDescription: String
     @Published var editSourceURL: String
+    @Published var editIngredients: String
+    @Published var editPreparation: String
+    @Published var editNotes: String
     @Published var errorMessage: String?
 
     private let environment: AppEnvironment
@@ -29,6 +32,9 @@ final class RecipeDetailViewModel: ObservableObject {
         self.editTitle = recipe.title
         self.editDescription = recipe.description
         self.editSourceURL = recipe.sourceURL ?? ""
+        self.editIngredients = recipe.ingredients.joined(separator: "\n")
+        self.editPreparation = recipe.preparationSteps.joined(separator: "\n")
+        self.editNotes = recipe.aiNotes.joined(separator: "\n")
     }
 
     func start() {
@@ -45,6 +51,9 @@ final class RecipeDetailViewModel: ObservableObject {
                     self.editSourceURL = updatedRecipe.sourceURL ?? ""
                     self.editableCategories = Set(updatedRecipe.categories)
                     self.editableTags = updatedRecipe.tagNames
+                    self.editIngredients = updatedRecipe.ingredients.joined(separator: "\n")
+                    self.editPreparation = updatedRecipe.preparationSteps.joined(separator: "\n")
+                    self.editNotes = updatedRecipe.aiNotes.joined(separator: "\n")
                 case .failure(let error):
                     self?.errorMessage = error.localizedDescription
                 }
@@ -131,6 +140,9 @@ final class RecipeDetailViewModel: ObservableObject {
                 sourceURL: editSourceURL,
                 categories: editableCategories.sorted(),
                 tagNames: editableTags,
+                ingredients: multilineEditorLines(from: editIngredients),
+                preparationSteps: multilineEditorLines(from: editPreparation),
+                notes: multilineEditorLines(from: editNotes),
                 imageData: imageData
             )
 
@@ -139,9 +151,19 @@ final class RecipeDetailViewModel: ObservableObject {
             recipe.sourceURL = editSourceURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : editSourceURL.trimmingCharacters(in: .whitespacesAndNewlines)
             recipe.categories = editableCategories.sorted()
             recipe.tagNames = editableTags
+            recipe.ingredients = multilineEditorLines(from: editIngredients)
+            recipe.preparationSteps = multilineEditorLines(from: editPreparation)
+            recipe.aiNotes = multilineEditorLines(from: editNotes)
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    private func multilineEditorLines(from value: String) -> [String] {
+        ImportedTextSanitizer.cleanMultiline(value)
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
     }
 
     func deleteRecipe() async {

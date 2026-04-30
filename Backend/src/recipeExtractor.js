@@ -10,6 +10,7 @@ const SYSTEM_PROMPT = [
   "Use only the provided input.",
   "Do not invent ingredients, quantities, or steps that are not supported by the source.",
   "If the source is incomplete, return empty arrays or an empty summary rather than guessing.",
+  "The summary must be exactly one concise sentence.",
   "Keep ingredient lines concise.",
   "Keep preparation steps ordered and actionable.",
   "Put any uncertainty or missing-data caveats into notes."
@@ -93,7 +94,7 @@ function normalizePayload(payload = {}) {
 
 function normalizeExtraction(value = {}) {
   return {
-    summary: clampString(value.summary, 3000),
+    summary: clampString(value.summary, 3000).replace(/\s+/g, " ").trim(),
     ingredients: normalizeStringArray(value.ingredients, 40, 240),
     preparation_steps: normalizeStringArray(value.preparation_steps, 30, 500),
     notes: normalizeStringArray(value.notes, 12, 300),
