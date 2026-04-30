@@ -17,7 +17,7 @@ struct ShareComposerView: View {
                             .controlSize(.large)
                         Text("Extracting recipe data…")
                             .font(.system(size: 18, weight: .bold, design: .rounded))
-                        Text("We’re generating a preview with title, image, summary, ingredients, preparation, and notes.")
+                        Text("We’re generating a preview with title, image, ingredients, preparation, and notes.")
                             .font(.system(size: 14, weight: .medium, design: .rounded))
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
@@ -108,11 +108,6 @@ struct ShareComposerView: View {
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .shareInputFieldStyle(minHeight: 68)
-            }
-
-            inputSection(title: "Description") {
-                TextField("One-sentence summary", text: $viewModel.description, axis: .vertical)
-                    .shareInputFieldStyle(minHeight: 92)
             }
 
             inputSection(title: "Ingredients") {

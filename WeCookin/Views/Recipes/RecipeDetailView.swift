@@ -218,15 +218,6 @@ struct RecipeDetailView: View {
 
     private func recipeOverviewBody(metrics: RecipeDetailLayoutMetrics) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text(viewModel.recipe.description.isEmpty ? "No clipped description yet." : viewModel.recipe.description)
-                .font(.system(size: metrics.bodyTextSize, weight: .medium, design: .rounded))
-                .foregroundStyle(RecipeTheme.textPrimary)
-
-            if !viewModel.recipe.ingredients.isEmpty || !viewModel.recipe.preparationSteps.isEmpty || !viewModel.recipe.aiNotes.isEmpty {
-                Divider()
-                    .padding(.vertical, 2)
-            }
-
             if !viewModel.recipe.ingredients.isEmpty {
                 recipeContentSection(
                     title: "Ingredients",
@@ -396,10 +387,6 @@ struct RecipeDetailView: View {
     private var shareItems: [Any] {
         var details: [String] = [viewModel.recipe.title]
 
-        if !viewModel.recipe.description.isEmpty {
-            details.append(viewModel.recipe.description)
-        }
-
         if !viewModel.recipe.ingredients.isEmpty {
             details.append("Ingredients:\n" + viewModel.recipe.ingredients.map { "• \($0)" }.joined(separator: "\n"))
         }
@@ -452,9 +439,6 @@ struct RecipeDetailView: View {
 
                     TextField("Title", text: $viewModel.editTitle)
                         .recipeInputFieldStyle()
-
-                    TextField("Description", text: $viewModel.editDescription, axis: .vertical)
-                        .recipeInputFieldStyle(minHeight: 110)
 
                     TextField("Source URL", text: $viewModel.editSourceURL, axis: .vertical)
                         .textInputAutocapitalization(.never)

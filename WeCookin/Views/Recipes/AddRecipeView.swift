@@ -92,7 +92,7 @@ struct AddRecipeView: View {
                         .foregroundStyle(.secondary)
                 }
             } else {
-                Text("We’ll pull the image and title from the link, then generate a short description, ingredients, preparation, and notes for you to edit before saving.")
+                Text("We’ll pull the image and title from the link, then generate ingredients, preparation, and notes for you to edit before saving.")
                     .font(.system(size: 13, weight: .medium, design: .rounded))
                     .foregroundStyle(.secondary)
             }
@@ -134,11 +134,6 @@ struct AddRecipeView: View {
             inputSection(title: "Title") {
                 TextField("Recipe title", text: $viewModel.draft.title)
                     .recipeFormInputStyle()
-            }
-
-            inputSection(title: "Description") {
-                TextField("One-sentence summary", text: $viewModel.draft.description, axis: .vertical)
-                    .recipeFormInputStyle(minHeight: 92)
             }
 
             inputSection(title: "Ingredients") {
