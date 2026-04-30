@@ -135,8 +135,6 @@ final class HomeViewModel: ObservableObject {
                         aiSummary: generatedEnrichment?.summary
                     ),
                     ingredients: draft.ingredients.isEmpty ? (generatedEnrichment?.ingredients ?? []) : draft.ingredients,
-                    preparationSteps: draft.preparationSteps.isEmpty ? (generatedEnrichment?.preparationSteps ?? []) : draft.preparationSteps,
-                    notes: draft.notes.isEmpty ? (generatedEnrichment?.notes ?? []) : draft.notes,
                     confidence: generatedEnrichment?.confidence
                 )
 
@@ -169,6 +167,5 @@ final class HomeViewModel: ObservableObject {
             || recipe.categories.contains(where: { $0.localizedCaseInsensitiveContains(query) })
             || recipe.tagNames.contains(where: { $0.localizedCaseInsensitiveContains(query) })
             || recipe.ingredients.contains(where: { $0.localizedCaseInsensitiveContains(query) })
-            || recipe.preparationSteps.contains(where: { $0.localizedCaseInsensitiveContains(query) })
     }
 }

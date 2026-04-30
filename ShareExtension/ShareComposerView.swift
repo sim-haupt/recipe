@@ -17,7 +17,7 @@ struct ShareComposerView: View {
                             .controlSize(.large)
                         Text("Extracting recipe data…")
                             .font(.system(size: 18, weight: .bold, design: .rounded))
-                        Text("We’re generating a preview with title, image, ingredients, preparation, and notes.")
+                        Text("We’re generating a preview with title, image, and ingredients.")
                             .font(.system(size: 14, weight: .medium, design: .rounded))
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
@@ -115,16 +115,6 @@ struct ShareComposerView: View {
                     .shareInputFieldStyle(minHeight: 150)
             }
 
-            inputSection(title: "Preparation") {
-                TextField("One step per line", text: $viewModel.preparationText, axis: .vertical)
-                    .shareInputFieldStyle(minHeight: 170)
-            }
-
-            inputSection(title: "Notes") {
-                TextField("Extra notes, substitutions, or tips", text: $viewModel.notesText, axis: .vertical)
-                    .shareInputFieldStyle(minHeight: 120)
-            }
-
             inputSection(title: "Categories") {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 10)], spacing: 10) {
                     ForEach(RecipeCategory.allTitles, id: \.self) { category in
@@ -149,6 +139,7 @@ struct ShareComposerView: View {
                                 .overlay {
                                     Capsule()
                                         .stroke(RecipeCategory.strokeColor(for: category, isSelected: isSelected), lineWidth: 1)
+                                        .allowsHitTesting(false)
                                 }
                         }
                         .buttonStyle(.plain)
@@ -167,6 +158,7 @@ struct ShareComposerView: View {
         .overlay {
             RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .stroke(Color.black.opacity(0.05), lineWidth: 1)
+                .allowsHitTesting(false)
         }
         .shadow(color: Color.black.opacity(0.08), radius: 10, y: 6)
     }
@@ -245,6 +237,7 @@ private extension View {
             .overlay {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .stroke(Color.black.opacity(0.06), lineWidth: 1)
+                    .allowsHitTesting(false)
             }
     }
 }
@@ -270,6 +263,7 @@ private struct ShareTagEditor: View {
                     .overlay {
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
                             .stroke(Color.black.opacity(0.06), lineWidth: 1)
+                            .allowsHitTesting(false)
                     }
                     .submitLabel(.done)
                     .onSubmit { commitDraftTags() }

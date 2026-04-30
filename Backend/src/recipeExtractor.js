@@ -2,7 +2,7 @@ import OpenAI from "openai";
 
 import { recipeExtractionSchema } from "./schema.js";
 
-const DEFAULT_MODEL = process.env.OPENAI_MODEL || "gpt-4.1";
+const DEFAULT_MODEL = process.env.OPENAI_MODEL || "gpt-5.2";
 const MAX_TEXT_LENGTH = 24000;
 const FETCHED_TEXT_LENGTH = 16000;
 
@@ -11,19 +11,20 @@ const SYSTEM_PROMPT = [
   "Use only the provided input.",
   "The scraped text may include navigation, related content, social captions, cookie text, or other page chrome.",
   "For Instagram, TikTok, reels, or other social posts, the useful recipe content may appear only in the caption or page description.",
-  "When social captions contain ingredients or steps inline, extract them from dashed lines, numbered lines, emoji-prefixed lines, or short instruction sentences.",
+  "When social captions contain recipe data inline, extract ingredient lines from dashed lines, numbered lines, emoji-prefixed lines, or short inventory-style sentences.",
   "Social captions may be bilingual or duplicated in multiple languages. If the same recipe appears twice in different languages, merge it into one clean extraction instead of duplicating the recipe.",
+  "Always return ingredient lines in English.",
+  "If the source is only in German, translate the ingredient lines into natural English while preserving amounts and measurements.",
+  "If the source includes both German and English, always prefer the English version and discard the duplicate German version.",
   "Treat section markers such as REZEPT, RECIPE, ZUTATEN, INGREDIENTS, Zum Zusammenbauen, To assemble, Preparation, Instructions, Notes, Tipps, or Tips as strong recipe structure hints.",
   "Ignore engagement counts, hashtags, ad markers, creator mentions, discount codes, and conversational intro/outro text unless they contain actual recipe instructions, storage guidance, or ingredient details.",
-  "If a caption mixes German and English, extract the recipe normally. Do not reject or flatten the content just because it is multilingual.",
-  "Prioritize recipe-specific content such as structured ingredients, instructions, and notes.",
-  "Ignore unrelated page text, author bios, comment prompts, navigation labels, and legal/footer text.",
-  "Do not invent ingredients, quantities, or steps that are not supported by the source.",
+  "Prioritize recipe-specific content such as structured ingredient lines.",
+  "Ignore unrelated page text, author bios, comment prompts, navigation labels, legal/footer text, and preparation instructions.",
+  "Do not invent ingredients or quantities that are not supported by the source.",
   "If the source is incomplete, return empty arrays or an empty summary rather than guessing.",
-  "The summary must be exactly one concise sentence.",
+  "The summary must be exactly one concise sentence in English.",
   "Keep ingredient lines concise.",
-  "Keep preparation steps ordered and actionable.",
-  "Put any uncertainty or missing-data caveats into notes."
+  "Return ingredients only. Do not return preparation steps or notes."
 ].join(" ");
 
 export async function extractRecipeContent(payload) {
@@ -107,14 +108,9 @@ function normalizePayload(payload = {}) {
 function normalizeExtraction(value = {}, request = {}) {
   const heuristic = heuristicExtractionFromRequest(request);
   const ingredients = normalizeRecipeArray(value.ingredients, 40, 240);
-  const preparationSteps = normalizeRecipeArray(value.preparation_steps, 30, 360);
-  const notes = normalizeRecipeArray(value.notes, 12, 300);
-
   return {
     summary: clampString(value.summary, 3000).replace(/\s+/g, " ").trim(),
     ingredients: shouldUseHeuristicIngredients(ingredients) ? heuristic.ingredients : ingredients,
-    preparation_steps: shouldUseHeuristicPreparation(preparationSteps, heuristic.ingredients) ? heuristic.preparation_steps : preparationSteps,
-    notes: notes.length > 0 ? notes : heuristic.notes,
     confidence: normalizeConfidence(value.confidence)
   };
 }
@@ -163,10 +159,11 @@ function buildUserPrompt(payload) {
 
   return [
     "Extraction guidance:",
-    "- Prefer the ingredient and step lines over any intro, ad, or commentary text.",
-    "- If the same recipe is repeated in two languages, keep one normalized set of ingredients and steps.",
-    "- Keep storage guidance or yield/prep-time details in notes, not in preparation steps.",
-    "- Do not return one giant paragraph as a single preparation step.",
+    "- Prefer ingredient lines over any intro, ad, commentary, or instruction text.",
+    "- Return ingredients only.",
+    "- If the same recipe is repeated in two languages, keep one normalized English set of ingredients.",
+    "- If the source is only German, translate ingredients to English.",
+    "- Ignore preparation instructions, storage tips, and assembly notes.",
     `Source URL: ${payload.sourceURL || ""}`,
     `Title: ${payload.title || ""}`,
     `Description: ${payload.description || ""}`,
@@ -285,17 +282,6 @@ function focusRecipeLines(lines) {
     ["ingredients", "ingredient list", "what you need"],
     ["instructions", "directions", "method", "preparation", "steps", "how to make", "notes", "tips"]
   );
-  const preparationSection = sectionLines(
-    lines,
-    ["instructions", "directions", "method", "preparation", "steps", "how to make"],
-    ["notes", "tips", "nutrition", "related recipes"]
-  );
-  const notesSection = sectionLines(
-    lines,
-    ["notes", "tips"],
-    ["nutrition", "related recipes"]
-  );
-
   const intro = lines
     .filter((line) => !line.toLowerCase().includes("ingredients") && !line.toLowerCase().includes("instructions"))
     .slice(0, 4);
@@ -303,8 +289,6 @@ function focusRecipeLines(lines) {
   const result = [];
   if (intro.length) result.push(...intro);
   if (ingredientSection.length) result.push("Ingredients:", ...ingredientSection);
-  if (preparationSection.length) result.push("Preparation:", ...preparationSection);
-  if (notesSection.length) result.push("Notes:", ...notesSection);
 
   return dedupe(result).slice(0, 90);
 }
@@ -440,26 +424,9 @@ function heuristicExtractionFromRequest(request = {}) {
       .map(cleanRecipeLine)
   ).slice(0, 24);
 
-  const preparation = dedupe(
-    lines
-      .filter(looksLikePreparationLine)
-      .map(cleanRecipeLine)
-  )
-    .filter((line) => !ingredients.includes(line))
-    .slice(0, 18);
-
-  const notes = dedupe(
-    lines
-      .filter((line) => /\b(fridge|refrigerator|keep|store|serves?|portion|prep time|cook time|kühlschrank|hält sich|portionen|zubereitungszeit)\b/i.test(line))
-      .map(cleanRecipeLine)
-  )
-    .filter((line) => !ingredients.includes(line) && !preparation.includes(line))
-    .slice(0, 8);
-
   return {
-    ingredients,
-    preparation_steps: preparation,
-    notes
+    summary: summarizeFromLines(lines),
+    ingredients
   };
 }
 
@@ -471,23 +438,15 @@ function looksLikeIngredientLine(line) {
     || /\b(onion|garlic|ginger|chickpeas?|tomato paste|mayo|lemon juice|bread|lettuce|cucumber|zwiebel|knoblauch|ingwer|kichererbsen|tomatenmark|zitrone)\b/i.test(lower);
 }
 
-function looksLikePreparationLine(line) {
-  const lower = line.toLowerCase();
-  if (lower.length < 12 || lower.includes("likes") || lower.includes("comments")) return false;
-  if (lower.includes("recipe (") || lower.includes("rezept (")) return false;
-  return /\b(add|mix|chop|serve|assemble|cook|bake|fry|heat|stir|whisk|combine|fold|marinate|vermischen|braten|servieren|zusammenbauen|klein schneiden|anbraten|belegen|genießen)\b/i.test(lower)
-    || /^to assemble:?$/i.test(line);
+function summarizeFromLines(lines) {
+  return clampString(
+    (lines.find((line) => !looksLikeIngredientLine(line)) || lines[0] || "")
+      .replace(/\s+/g, " ")
+      .trim(),
+    220
+  );
 }
 
 function shouldUseHeuristicIngredients(ingredients) {
   return ingredients.length === 0 || (ingredients.length === 1 && ingredients[0].length > 220);
-}
-
-function shouldUseHeuristicPreparation(preparationSteps, heuristicIngredients) {
-  if (preparationSteps.length === 0) return true;
-  if (preparationSteps.length === 1 && preparationSteps[0].length > 260) return true;
-  if (preparationSteps.some((line) => /recipe\s*\(|rezept\s*\(|likes|comments|@/.test(line.toLowerCase()))) {
-    return true;
-  }
-  return preparationSteps.every((line) => heuristicIngredients.includes(line));
 }

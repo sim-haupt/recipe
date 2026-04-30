@@ -72,8 +72,6 @@ final class RecipeEnrichmentService: RecipeEnrichmentServicing {
         RecipeAIExtraction(
             summary: primary.summary.isEmpty ? fallback.summary : primary.summary,
             ingredients: shouldPreferFallbackIngredients(primary.ingredients, fallback: fallback.ingredients) ? fallback.ingredients : primary.ingredients,
-            preparationSteps: shouldPreferFallbackPreparation(primary.preparationSteps, fallback: fallback.preparationSteps) ? fallback.preparationSteps : primary.preparationSteps,
-            notes: shouldPreferFallbackNotes(primary.notes, fallback: fallback.notes) ? fallback.notes : primary.notes,
             confidence: primary.confidence ?? fallback.confidence
         )
     }
@@ -89,23 +87,6 @@ final class RecipeEnrichmentService: RecipeEnrichmentServicing {
 
         return primary.contains(where: isSuspiciousRecipeBlob)
     }
-
-    private func shouldPreferFallbackPreparation(_ primary: [String], fallback: [String]) -> Bool {
-        if primary.isEmpty {
-            return !fallback.isEmpty
-        }
-
-        if primary.count == 1, let first = primary.first, first.count > 220 {
-            return !fallback.isEmpty
-        }
-
-        return primary.contains(where: isSuspiciousRecipeBlob) && !fallback.isEmpty
-    }
-
-    private func shouldPreferFallbackNotes(_ primary: [String], fallback: [String]) -> Bool {
-        primary.isEmpty && !fallback.isEmpty
-    }
-
     private func isSuspiciousRecipeBlob(_ value: String) -> Bool {
         let lowercased = value.lowercased()
         if lowercased.contains("recipe (") || lowercased.contains("rezept (") {
@@ -147,15 +128,11 @@ private final class HeuristicRecipeEnrichmentService {
             .filter { !$0.isEmpty }
 
         let ingredients = extractIngredients(from: rawLines)
-        let preparationSteps = extractPreparationSteps(from: rawLines)
-        let notes = extractNotes(from: rawLines, excluding: Set(ingredients + preparationSteps))
 
         return RecipeAIExtraction(
             summary: summary,
             ingredients: ingredients,
-            preparationSteps: preparationSteps,
-            notes: notes,
-            confidence: inferredConfidence(summary: summary, ingredients: ingredients, preparationSteps: preparationSteps)
+            confidence: inferredConfidence(summary: summary, ingredients: ingredients)
         )
     }
 
@@ -168,31 +145,6 @@ private final class HeuristicRecipeEnrichmentService {
             .filter { looksLikeIngredient($0) }
             .prefix(18)
             .map { normalizeListLine($0) }
-    }
-
-    private func extractPreparationSteps(from lines: [String]) -> [String] {
-        sectionLines(
-            from: lines,
-            matchingHeaders: ["instructions", "directions", "method", "preparation", "steps", "how to make"],
-            untilHeaders: ["notes", "tips", "nutrition"]
-        ) ?? lines
-            .filter { looksLikePreparationStep($0) }
-            .prefix(12)
-            .map { normalizeListLine($0) }
-    }
-
-    private func extractNotes(from lines: [String], excluding excludedLines: Set<String>) -> [String] {
-        let extracted = sectionLines(
-            from: lines,
-            matchingHeaders: ["notes", "tips"],
-            untilHeaders: ["nutrition"]
-        ) ?? []
-
-        return extracted
-            .map { normalizeListLine($0) }
-            .filter { !excludedLines.contains($0) }
-            .prefix(6)
-            .map { $0 }
     }
 
     private func sectionLines(from lines: [String], matchingHeaders headers: [String], untilHeaders endHeaders: [String]) -> [String]? {
@@ -225,25 +177,17 @@ private final class HeuristicRecipeEnrichmentService {
             || lowercased.range(of: #"\b(cup|cups|tbsp|tsp|teaspoon|teaspoons|tablespoon|tablespoons|g|kg|oz|lb|ml|l|pinch|clove|cloves|slice|slices)\b"#, options: .regularExpression) != nil
     }
 
-    private func looksLikePreparationStep(_ line: String) -> Bool {
-        let lowercased = line.lowercased()
-        if lowercased.count < 18 { return false }
-        if lowercased.contains("ingredients") { return false }
-        return lowercased.range(of: #"^(\d+[\.\)]|step\s+\d+)"#, options: .regularExpression) != nil
-            || lowercased.range(of: #"\b(mix|stir|bake|cook|heat|whisk|combine|serve|add|preheat|simmer|boil|roast|grill|fold|chop|assemble|fry|marinate|vermischen|braten|servieren|zusammenbauen)\b"#, options: .regularExpression) != nil
-    }
-
     private func normalizeListLine(_ line: String) -> String {
         line
             .replacingOccurrences(of: #"^(\d+[\.\)]\s*|[\-\u2022]\s*|step\s+\d+\s*[:\-]?\s*)"#, with: "", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private func inferredConfidence(summary: String, ingredients: [String], preparationSteps: [String]) -> Double? {
-        if !ingredients.isEmpty && !preparationSteps.isEmpty {
+    private func inferredConfidence(summary: String, ingredients: [String]) -> Double? {
+        if !ingredients.isEmpty {
             return 0.56
         }
-        if !summary.isEmpty && (!ingredients.isEmpty || !preparationSteps.isEmpty) {
+        if !summary.isEmpty && !ingredients.isEmpty {
             return 0.42
         }
         return nil
@@ -267,17 +211,12 @@ private struct BackendRecipeEnrichmentRequest: Encodable {
 private struct BackendRecipeEnrichmentResponse: Decodable {
     let summary: String?
     let ingredients: [String]?
-    let preparationSteps: [String]?
-    let preparation_steps: [String]?
-    let notes: [String]?
     let confidence: Double?
 
     var asExtraction: RecipeAIExtraction {
         RecipeAIExtraction(
             summary: summary?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "",
             ingredients: ingredients ?? [],
-            preparationSteps: preparationSteps ?? preparation_steps ?? [],
-            notes: notes ?? [],
             confidence: confidence
         )
     }

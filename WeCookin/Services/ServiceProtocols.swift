@@ -43,8 +43,6 @@ protocol RecipeServicing {
         categories: [String],
         tagNames: [String],
         ingredients: [String],
-        preparationSteps: [String],
-        notes: [String],
         imageData: Data?
     ) async throws
     func deleteRecipe(recipe: Recipe, householdID: String) async throws

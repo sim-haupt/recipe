@@ -144,17 +144,21 @@ struct HomeView: View {
 
                             VStack(alignment: .leading, spacing: metrics.sectionSpacing) {
                                 categoriesSection(metrics: metrics)
+                                    .zIndex(3)
 
                                 RecipeTabSelector(
                                     selectedTab: $selectedTab
                                 )
+                                .zIndex(3)
 
                                 RecipeFeedHeader(
                                     subtitle: "\(displayedRecipes.count) recipes",
                                     feedStyle: $feedStyle
                                 )
+                                .zIndex(3)
 
                                 recipeFeed(metrics: metrics)
+                                    .zIndex(1)
                             }
                             .frame(maxWidth: .infinity, alignment: .topLeading)
                             .padding(.horizontal, metrics.horizontalPadding)
@@ -187,9 +191,6 @@ struct HomeView: View {
                         .frame(minHeight: proxy.size.height, alignment: .top)
                     }
                     .scrollDismissesKeyboard(.interactively)
-                    .simultaneousGesture(TapGesture().onEnded {
-                        isSearchFocused = false
-                    })
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
@@ -427,6 +428,7 @@ private struct HomeHeroSection: View {
                             .frame(width: metrics.heroRingTwo, height: metrics.heroRingTwo)
                             .offset(x: metrics.availableWidth * 0.04, y: metrics.heroRingOffsetTwoY)
                     }
+                    .allowsHitTesting(false)
                 }
 
             VStack(alignment: .leading, spacing: 14) {

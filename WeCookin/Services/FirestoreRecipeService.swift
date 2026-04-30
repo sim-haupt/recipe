@@ -107,8 +107,8 @@ final class FirestoreRecipeService: RecipeServicing {
             "isFavorite": false,
             "reviewCount": input.initialRating > 0 ? 1 : 0,
             "ingredients": extraction?.ingredients ?? [],
-            "preparationSteps": extraction?.preparationSteps ?? [],
-            "aiNotes": extraction?.notes ?? []
+            "preparationSteps": [],
+            "aiNotes": []
         ]
         payload["sourceURL"] = input.sourceURL.isEmpty ? NSNull() : input.sourceURL
         payload["imageURL"] = imageURL ?? NSNull()
@@ -161,8 +161,6 @@ final class FirestoreRecipeService: RecipeServicing {
         categories: [String],
         tagNames: [String],
         ingredients: [String],
-        preparationSteps: [String],
-        notes: [String],
         imageData: Data?
     ) async throws {
         let tags = try await ensureTags(tagNames: tagNames, householdID: householdID)
@@ -177,8 +175,8 @@ final class FirestoreRecipeService: RecipeServicing {
             "tagIDs": tags.map(\.id),
             "tagNames": tags.map(\.name),
             "ingredients": ingredients,
-            "preparationSteps": preparationSteps,
-            "aiNotes": notes,
+            "preparationSteps": [],
+            "aiNotes": [],
             "updatedAt": Timestamp(date: Date())
         ]
         if let imageURL {

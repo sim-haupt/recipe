@@ -1,6 +1,6 @@
 # WeCookin AI Enrichment Backend
 
-This backend keeps your OpenAI API key off the iPhone app. The app sends extracted page or post text here, and this service returns structured recipe data for ingredients and preparation.
+This backend keeps your OpenAI API key off the iPhone app. The app sends extracted page or post text here, and this service returns structured recipe data for ingredients only.
 
 ## Endpoints
 
@@ -24,8 +24,6 @@ This backend keeps your OpenAI API key off the iPhone app. The app sends extract
 {
   "summary": "Short recipe summary",
   "ingredients": ["1 lb chicken", "2 tortillas"],
-  "preparation_steps": ["Preheat the oven.", "Bake the chicken."],
-  "notes": ["If the source text is incomplete, fields may be empty."],
   "confidence": 0.86
 }
 ```
@@ -67,7 +65,7 @@ This repo is a monorepo, so the Railway service should deploy only the backend s
 
 4. In service variables, add:
    - `OPENAI_API_KEY`
-   - `OPENAI_MODEL` = `gpt-4.1`
+   - `OPENAI_MODEL` = `gpt-5.2`
 5. In the service Networking settings, generate a public domain.
 6. In the service Deploy settings, set the config-as-code path to:
 
@@ -89,5 +87,6 @@ https://your-service.up.railway.app/api/recipe-extract
 ## Notes
 
 - The backend uses the OpenAI Responses API with strict JSON schema output.
-- If the model cannot find enough recipe detail in the source text, it should return empty arrays instead of inventing content.
+- If the model cannot find enough ingredient detail in the source text, it should return empty arrays instead of inventing content.
+- The backend always normalizes ingredient output to English. If a post is German-only, it translates ingredients into English; if a post is bilingual, it prefers the English version.
 - Instagram, WhatsApp, and some other apps may only share partial captions or links, so extraction quality depends on what iOS makes available.

@@ -216,8 +216,8 @@ final class DemoRecipeService: RecipeServicing {
             averageRating: input.initialRating > 0 ? Double(input.initialRating) : nil,
             reviewCount: input.initialRating > 0 ? 1 : 0,
             ingredients: extraction?.ingredients ?? [],
-            preparationSteps: extraction?.preparationSteps ?? [],
-            aiNotes: extraction?.notes ?? [],
+            preparationSteps: [],
+            aiNotes: [],
             aiSummary: normalizedOptionalString(extraction?.summary),
             aiConfidence: extraction?.confidence
         )
@@ -259,8 +259,6 @@ final class DemoRecipeService: RecipeServicing {
         categories: [String],
         tagNames: [String],
         ingredients: [String],
-        preparationSteps: [String],
-        notes: [String],
         imageData: Data?
     ) async throws {
         let tags = ensureTags(tagNames: tagNames, householdID: householdID)
@@ -275,8 +273,8 @@ final class DemoRecipeService: RecipeServicing {
         recipes[index].tagIDs = tags.map(\.id)
         recipes[index].tagNames = tags.map(\.name)
         recipes[index].ingredients = ingredients
-        recipes[index].preparationSteps = preparationSteps
-        recipes[index].aiNotes = notes
+        recipes[index].preparationSteps = []
+        recipes[index].aiNotes = []
         if let imageData {
             recipes[index].imageURL = try store.persistImageData(imageData, fileName: recipe.id)
         }

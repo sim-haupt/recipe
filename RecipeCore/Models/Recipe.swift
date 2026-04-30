@@ -3,22 +3,16 @@ import Foundation
 struct RecipeAIExtraction: Codable, Hashable {
     var summary: String
     var ingredients: [String]
-    var preparationSteps: [String]
-    var notes: [String]
     var confidence: Double?
 
     var hasMeaningfulContent: Bool {
         !summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             || !ingredients.isEmpty
-            || !preparationSteps.isEmpty
-            || !notes.isEmpty
     }
 
     static let empty = RecipeAIExtraction(
         summary: "",
         ingredients: [],
-        preparationSteps: [],
-        notes: [],
         confidence: nil
     )
 }

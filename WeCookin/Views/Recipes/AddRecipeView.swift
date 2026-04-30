@@ -98,7 +98,7 @@ struct AddRecipeView: View {
                         .foregroundStyle(.secondary)
                 }
             } else {
-                Text("We’ll pull the image and title from the link, then generate ingredients, preparation, and notes for you to edit before saving.")
+                Text("We’ll pull the image and title from the link, then generate an ingredient list for you to edit before saving.")
                     .font(.system(size: 13, weight: .medium, design: .rounded))
                     .foregroundStyle(.secondary)
             }
@@ -145,16 +145,6 @@ struct AddRecipeView: View {
             inputSection(title: "Ingredients") {
                 TextField("One ingredient per line", text: $viewModel.draft.ingredientsText, axis: .vertical)
                     .recipeFormInputStyle(minHeight: 150)
-            }
-
-            inputSection(title: "Preparation") {
-                TextField("One step per line", text: $viewModel.draft.preparationText, axis: .vertical)
-                    .recipeFormInputStyle(minHeight: 170)
-            }
-
-            inputSection(title: "Notes") {
-                TextField("Extra notes, substitutions, or tips", text: $viewModel.draft.notesText, axis: .vertical)
-                    .recipeFormInputStyle(minHeight: 120)
             }
 
             inputSection(title: "Categories") {

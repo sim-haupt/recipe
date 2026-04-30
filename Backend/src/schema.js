@@ -11,26 +11,12 @@ export const recipeExtractionSchema = {
       items: {
         type: "string"
       },
-      description: "A list of ingredient lines from the source."
-    },
-    preparation_steps: {
-      type: "array",
-      items: {
-        type: "string"
-      },
-      description: "Ordered preparation steps from the source."
-    },
-    notes: {
-      type: "array",
-      items: {
-        type: "string"
-      },
-      description: "Optional extra notes or caveats."
+      description: "A list of ingredient lines from the source, always in English."
     },
     confidence: {
       type: "number",
       description: "A 0-1 confidence estimate for the extraction."
     }
   },
-  required: ["summary", "ingredients", "preparation_steps", "notes", "confidence"]
+  required: ["summary", "ingredients", "confidence"]
 };

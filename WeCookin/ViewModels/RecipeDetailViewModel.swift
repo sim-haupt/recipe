@@ -13,8 +13,6 @@ final class RecipeDetailViewModel: ObservableObject {
     @Published var editDescription: String
     @Published var editSourceURL: String
     @Published var editIngredients: String
-    @Published var editPreparation: String
-    @Published var editNotes: String
     @Published var errorMessage: String?
 
     private let environment: AppEnvironment
@@ -33,8 +31,6 @@ final class RecipeDetailViewModel: ObservableObject {
         self.editDescription = recipe.description
         self.editSourceURL = recipe.sourceURL ?? ""
         self.editIngredients = recipe.ingredients.joined(separator: "\n")
-        self.editPreparation = recipe.preparationSteps.joined(separator: "\n")
-        self.editNotes = recipe.aiNotes.joined(separator: "\n")
     }
 
     func start() {
@@ -52,8 +48,6 @@ final class RecipeDetailViewModel: ObservableObject {
                     self.editableCategories = Set(updatedRecipe.categories)
                     self.editableTags = updatedRecipe.tagNames
                     self.editIngredients = updatedRecipe.ingredients.joined(separator: "\n")
-                    self.editPreparation = updatedRecipe.preparationSteps.joined(separator: "\n")
-                    self.editNotes = updatedRecipe.aiNotes.joined(separator: "\n")
                 case .failure(let error):
                     self?.errorMessage = error.localizedDescription
                 }
@@ -141,8 +135,6 @@ final class RecipeDetailViewModel: ObservableObject {
                 categories: editableCategories.sorted(),
                 tagNames: editableTags,
                 ingredients: multilineEditorLines(from: editIngredients),
-                preparationSteps: multilineEditorLines(from: editPreparation),
-                notes: multilineEditorLines(from: editNotes),
                 imageData: imageData
             )
 
@@ -152,8 +144,8 @@ final class RecipeDetailViewModel: ObservableObject {
             recipe.categories = editableCategories.sorted()
             recipe.tagNames = editableTags
             recipe.ingredients = multilineEditorLines(from: editIngredients)
-            recipe.preparationSteps = multilineEditorLines(from: editPreparation)
-            recipe.aiNotes = multilineEditorLines(from: editNotes)
+            recipe.preparationSteps = []
+            recipe.aiNotes = []
         } catch {
             errorMessage = error.localizedDescription
         }

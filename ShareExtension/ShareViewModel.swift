@@ -6,8 +6,6 @@ final class ShareViewModel: ObservableObject {
     @Published var description = ""
     @Published var rawText = ""
     @Published var ingredientsText = ""
-    @Published var preparationText = ""
-    @Published var notesText = ""
     @Published var sourceURL = ""
     @Published var tags: [String] = []
     @Published var selectedCategories = Set<String>()
@@ -56,8 +54,6 @@ final class ShareViewModel: ObservableObject {
             aiSummary: enrichment?.summary
         )
         ingredientsText = (enrichment?.ingredients ?? []).joined(separator: "\n")
-        preparationText = (enrichment?.preparationSteps ?? []).joined(separator: "\n")
-        notesText = (enrichment?.notes ?? []).joined(separator: "\n")
         isLoading = false
     }
 
@@ -76,8 +72,8 @@ final class ShareViewModel: ObservableObject {
                 ),
                 rawText: ImportedTextSanitizer.cleanMultiline(rawText),
                 ingredients: parsedLines(from: ingredientsText),
-                preparationSteps: parsedLines(from: preparationText),
-                notes: parsedLines(from: notesText),
+                preparationSteps: [],
+                notes: [],
                 sourceURL: sourceURL.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
                 imageFileName: nil,
                 categories: selectedCategories.sorted(),

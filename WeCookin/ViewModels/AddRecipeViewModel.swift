@@ -96,10 +96,10 @@ final class AddRecipeViewModel: ObservableObject {
             }
 
             let enrichment = await fetchAIExtractionIfPossible()
-            let finalDescription = ImportedTextSanitizer.preferredRecipeDescription(
-                baseDescription: draft.description.trimmingCharacters(in: .whitespacesAndNewlines),
-                rawText: importedRawText.trimmingCharacters(in: .whitespacesAndNewlines),
-                aiSummary: enrichment?.summary
+        let finalDescription = ImportedTextSanitizer.preferredRecipeDescription(
+            baseDescription: draft.description.trimmingCharacters(in: .whitespacesAndNewlines),
+            rawText: importedRawText.trimmingCharacters(in: .whitespacesAndNewlines),
+            aiSummary: enrichment?.summary
             )
             let mergedExtraction = mergedExtraction(using: enrichment, description: finalDescription)
 
@@ -154,30 +154,18 @@ final class AddRecipeViewModel: ObservableObject {
         )
 
         let generatedIngredients = (enrichment?.ingredients ?? []).joined(separator: "\n")
-        let generatedPreparation = (enrichment?.preparationSteps ?? []).joined(separator: "\n")
-        let generatedNotes = (enrichment?.notes ?? []).joined(separator: "\n")
 
         if replaceExistingFields || draft.ingredientsText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             draft.ingredientsText = generatedIngredients
-        }
-        if replaceExistingFields || draft.preparationText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            draft.preparationText = generatedPreparation
-        }
-        if replaceExistingFields || draft.notesText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            draft.notesText = generatedNotes
         }
     }
 
     private func mergedExtraction(using generatedExtraction: RecipeAIExtraction?, description: String) -> RecipeAIExtraction? {
         let ingredients = parsedLines(from: draft.ingredientsText)
-        let preparationSteps = parsedLines(from: draft.preparationText)
-        let notes = parsedLines(from: draft.notesText)
 
         let extraction = RecipeAIExtraction(
             summary: description,
             ingredients: ingredients,
-            preparationSteps: preparationSteps,
-            notes: notes,
             confidence: generatedExtraction?.confidence ?? lastGeneratedExtraction?.confidence
         )
 
