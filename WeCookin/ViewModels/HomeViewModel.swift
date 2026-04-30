@@ -122,27 +122,34 @@ final class HomeViewModel: ObservableObject {
             let drafts = try environment.sharedDraftStore.pendingDrafts().filter { $0.importedAt == nil }
 
             for draft in drafts {
-                let enrichment = try? await environment.recipeEnrichmentService.enrichRecipeContent(using: RecipeEnrichmentRequest(
+                let generatedEnrichment = try? await environment.recipeEnrichmentService.enrichRecipeContent(using: RecipeEnrichmentRequest(
                     sourceURL: draft.sourceURL ?? "",
                     title: draft.title,
                     description: draft.description,
                     rawText: draft.rawText
                 ))
+                let draftEnrichment = RecipeAIExtraction(
+                    summary: ImportedTextSanitizer.preferredRecipeDescription(
+                        baseDescription: draft.description,
+                        rawText: draft.rawText,
+                        aiSummary: generatedEnrichment?.summary
+                    ),
+                    ingredients: draft.ingredients.isEmpty ? (generatedEnrichment?.ingredients ?? []) : draft.ingredients,
+                    preparationSteps: draft.preparationSteps.isEmpty ? (generatedEnrichment?.preparationSteps ?? []) : draft.preparationSteps,
+                    notes: draft.notes.isEmpty ? (generatedEnrichment?.notes ?? []) : draft.notes,
+                    confidence: generatedEnrichment?.confidence
+                )
 
                 let input = RecipeCreationInput(
                     title: draft.title,
-                    description: ImportedTextSanitizer.preferredRecipeDescription(
-                        baseDescription: draft.description,
-                        rawText: draft.rawText,
-                        aiSummary: enrichment?.summary
-                    ),
+                    description: draftEnrichment.summary,
                     sourceURL: draft.sourceURL ?? "",
                     categories: draft.categories,
                     tagNames: draft.tags,
                     imageData: environment.sharedDraftStore.imageData(for: draft),
                     initialComment: "",
                     initialRating: 0,
-                    aiExtraction: enrichment
+                    aiExtraction: draftEnrichment.hasMeaningfulContent ? draftEnrichment : nil
                 )
 
                 try await environment.recipeService.createRecipe(input: input, householdID: householdID, author: userProfile)

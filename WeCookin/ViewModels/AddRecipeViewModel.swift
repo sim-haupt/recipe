@@ -5,6 +5,7 @@ final class AddRecipeViewModel: ObservableObject {
     @Published var draft = RecipeComposerDraft(title: "", description: "", sourceURL: "", categories: [], tags: [], comments: "", rating: 0)
     @Published var isSaving = false
     @Published var isImportingURL = false
+    @Published var isGeneratingPreview = false
     @Published var errorMessage: String?
     @Published var selectedImageData: Data?
 
@@ -13,6 +14,7 @@ final class AddRecipeViewModel: ObservableObject {
     private var urlImportTask: Task<Void, Never>?
     private var lastImportedURL: String?
     private var importedRawText = ""
+    private var lastGeneratedExtraction: RecipeAIExtraction?
 
     init(environment: AppEnvironment, userProfile: UserProfile) {
         self.environment = environment
@@ -24,6 +26,7 @@ final class AddRecipeViewModel: ObservableObject {
         guard !trimmedURL.isEmpty else {
             urlImportTask?.cancel()
             importedRawText = ""
+            lastGeneratedExtraction = nil
             return
         }
 
@@ -49,18 +52,18 @@ final class AddRecipeViewModel: ObservableObject {
             if Task.isCancelled { return }
 
             let isNewImport = imported.canonicalURL != lastImportedURL
-            if isNewImport || draft.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                draft.title = imported.title
-            }
-            if isNewImport || draft.description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                draft.description = imported.description
-            }
+            draft.title = imported.title
             importedRawText = imported.rawText
             draft.sourceURL = imported.canonicalURL
             if let imageData = imported.imageData {
                 selectedImageData = imageData
             }
             lastImportedURL = imported.canonicalURL
+
+            await generatePreviewContent(
+                importedDescription: imported.description,
+                replaceExistingFields: isNewImport || force
+            )
         } catch {
             if force {
                 errorMessage = error.localizedDescription
@@ -90,6 +93,7 @@ final class AddRecipeViewModel: ObservableObject {
                 rawText: importedRawText.trimmingCharacters(in: .whitespacesAndNewlines),
                 aiSummary: enrichment?.summary
             )
+            let mergedExtraction = mergedExtraction(using: enrichment, description: finalDescription)
 
             let input = RecipeCreationInput(
                 title: draft.title.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -100,7 +104,7 @@ final class AddRecipeViewModel: ObservableObject {
                 imageData: selectedImageData,
                 initialComment: draft.comments.trimmingCharacters(in: .whitespacesAndNewlines),
                 initialRating: draft.rating,
-                aiExtraction: enrichment
+                aiExtraction: mergedExtraction
             )
             guard !input.title.isEmpty else {
                 errorMessage = "Paste a valid recipe link or enter a title before saving."
@@ -124,5 +128,56 @@ final class AddRecipeViewModel: ObservableObject {
 
         guard request.hasEnoughContent else { return nil }
         return try? await environment.recipeEnrichmentService.enrichRecipeContent(using: request)
+    }
+
+    private func generatePreviewContent(importedDescription: String, replaceExistingFields: Bool) async {
+        isGeneratingPreview = true
+        defer { isGeneratingPreview = false }
+
+        let enrichment = await fetchAIExtractionIfPossible()
+        lastGeneratedExtraction = enrichment
+
+        draft.description = ImportedTextSanitizer.preferredRecipeDescription(
+            baseDescription: importedDescription,
+            rawText: importedRawText,
+            aiSummary: enrichment?.summary
+        )
+
+        let generatedIngredients = (enrichment?.ingredients ?? []).joined(separator: "\n")
+        let generatedPreparation = (enrichment?.preparationSteps ?? []).joined(separator: "\n")
+        let generatedNotes = (enrichment?.notes ?? []).joined(separator: "\n")
+
+        if replaceExistingFields || draft.ingredientsText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            draft.ingredientsText = generatedIngredients
+        }
+        if replaceExistingFields || draft.preparationText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            draft.preparationText = generatedPreparation
+        }
+        if replaceExistingFields || draft.notesText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            draft.notesText = generatedNotes
+        }
+    }
+
+    private func mergedExtraction(using generatedExtraction: RecipeAIExtraction?, description: String) -> RecipeAIExtraction? {
+        let ingredients = parsedLines(from: draft.ingredientsText)
+        let preparationSteps = parsedLines(from: draft.preparationText)
+        let notes = parsedLines(from: draft.notesText)
+
+        let extraction = RecipeAIExtraction(
+            summary: description,
+            ingredients: ingredients,
+            preparationSteps: preparationSteps,
+            notes: notes,
+            confidence: generatedExtraction?.confidence ?? lastGeneratedExtraction?.confidence
+        )
+
+        return extraction.hasMeaningfulContent ? extraction : nil
+    }
+
+    private func parsedLines(from value: String) -> [String] {
+        ImportedTextSanitizer.cleanMultiline(value)
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
     }
 }

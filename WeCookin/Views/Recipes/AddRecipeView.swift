@@ -1,3 +1,4 @@
+import PhotosUI
 import SwiftUI
 import UIKit
 
@@ -5,6 +6,7 @@ struct AddRecipeView: View {
     @Environment(\.appEnvironment) private var environment
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel: AddRecipeViewModel
+    @State private var selectedPhoto: PhotosPickerItem?
 
     init(userProfile: UserProfile, environment: AppEnvironment = .demo) {
         _viewModel = StateObject(wrappedValue: AddRecipeViewModel(environment: environment, userProfile: userProfile))
@@ -12,56 +14,28 @@ struct AddRecipeView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section("Recipe Link") {
-                    TextField("Source URL", text: $viewModel.draft.sourceURL)
-                        .textInputAutocapitalization(.never)
-                        .keyboardType(.URL)
-                        .textContentType(.URL)
-                        .submitLabel(.go)
-                        .recipeFormInputStyle()
-                        .onSubmit {
-                            Task {
-                                await viewModel.fetchMetadataFromSourceURL(force: true)
-                            }
-                        }
-                    if viewModel.isImportingURL {
-                        HStack(spacing: 10) {
-                            ProgressView()
-                                .controlSize(.small)
-                            Text("Fetching title, image, and description…")
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-
-                    if !viewModel.draft.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                        || !viewModel.draft.description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                        || viewModel.selectedImageData != nil {
-                        importedPreview
-                    }
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 18) {
+                    sourceLinkCard
+                    generatedPreviewCard
                 }
-
-                Section("Categories") {
-                    CategorySelectionGrid(selectedCategories: $viewModel.draft.categories)
-                }
-
-                Section("Tags") {
-                    EditableTagEditor(
-                        tags: $viewModel.draft.tags,
-                        placeholder: "Add tags",
-                        helperText: viewModel.draft.tags.isEmpty ? "Tags are optional and will appear as hashtags on the recipe page." : nil
-                    )
-                }
+                .padding(.horizontal, 18)
+                .padding(.top, 18)
+                .padding(.bottom, 28)
             }
-            .scrollContentBackground(.hidden)
             .background(RecipeTheme.pageGradient.ignoresSafeArea())
-            .listRowBackground(Color.clear)
             .navigationTitle("Add Recipe")
             .navigationBarTitleDisplayMode(.inline)
             .tint(RecipeTheme.accentStrong)
             .onChange(of: viewModel.draft.sourceURL) { _, _ in
                 viewModel.scheduleURLImport()
+            }
+            .onChange(of: selectedPhoto) { _, newValue in
+                guard let newValue else { return }
+
+                Task {
+                    viewModel.selectedImageData = try? await newValue.loadTransferable(type: Data.self)
+                }
             }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -76,7 +50,7 @@ struct AddRecipeView: View {
                             }
                         }
                     }
-                    .disabled(viewModel.draft.sourceURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .disabled(viewModel.draft.sourceURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || viewModel.isSaving)
                 }
             }
             .alert("Unable to save", isPresented: Binding(
@@ -91,35 +65,155 @@ struct AddRecipeView: View {
         .environment(\.appEnvironment, environment)
     }
 
-    @ViewBuilder
-    private var importedPreview: some View {
+    private var sourceLinkCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Imported Preview")
-                .font(.system(size: 14, weight: .bold, design: .rounded))
+            Text("Recipe Link")
+                .font(.system(size: 17, weight: .bold, design: .rounded))
+                .foregroundStyle(RecipeTheme.textPrimary)
 
+            TextField("Paste a recipe link", text: $viewModel.draft.sourceURL)
+                .textInputAutocapitalization(.never)
+                .keyboardType(.URL)
+                .textContentType(.URL)
+                .submitLabel(.go)
+                .recipeFormInputStyle()
+                .onSubmit {
+                    Task {
+                        await viewModel.fetchMetadataFromSourceURL(force: true)
+                    }
+                }
+
+            if viewModel.isImportingURL || viewModel.isGeneratingPreview {
+                HStack(spacing: 10) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text(viewModel.isGeneratingPreview ? "Generating editable recipe preview…" : "Fetching recipe preview…")
+                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                Text("We’ll pull the image and title from the link, then generate a short description, ingredients, preparation, and notes for you to edit before saving.")
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RecipeTheme.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .stroke(RecipeTheme.strokeSoft, lineWidth: 1)
+        }
+        .shadow(color: RecipeTheme.shadow.opacity(0.55), radius: 10, y: 6)
+    }
+
+    private var generatedPreviewCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("Recipe Preview")
+                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .foregroundStyle(RecipeTheme.textPrimary)
+
+                Spacer()
+
+                PhotosPicker(selection: $selectedPhoto, matching: .images) {
+                    Label("Change Image", systemImage: "photo")
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .foregroundStyle(RecipeTheme.textOnAccent)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 9)
+                        .background(RecipeTheme.accentStrong)
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+
+            previewImage
+
+            inputSection(title: "Title") {
+                TextField("Recipe title", text: $viewModel.draft.title)
+                    .recipeFormInputStyle()
+            }
+
+            inputSection(title: "Description") {
+                TextField("One-sentence summary", text: $viewModel.draft.description, axis: .vertical)
+                    .recipeFormInputStyle(minHeight: 92)
+            }
+
+            inputSection(title: "Ingredients") {
+                TextField("One ingredient per line", text: $viewModel.draft.ingredientsText, axis: .vertical)
+                    .recipeFormInputStyle(minHeight: 150)
+            }
+
+            inputSection(title: "Preparation") {
+                TextField("One step per line", text: $viewModel.draft.preparationText, axis: .vertical)
+                    .recipeFormInputStyle(minHeight: 170)
+            }
+
+            inputSection(title: "Notes") {
+                TextField("Extra notes, substitutions, or tips", text: $viewModel.draft.notesText, axis: .vertical)
+                    .recipeFormInputStyle(minHeight: 120)
+            }
+
+            inputSection(title: "Categories") {
+                CategorySelectionGrid(selectedCategories: $viewModel.draft.categories)
+            }
+
+            inputSection(title: "Tags") {
+                EditableTagEditor(
+                    tags: $viewModel.draft.tags,
+                    placeholder: "Add tags",
+                    helperText: viewModel.draft.tags.isEmpty ? "Add any custom hashtags you want to keep with this recipe." : nil
+                )
+            }
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RecipeTheme.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .stroke(RecipeTheme.strokeSoft, lineWidth: 1)
+        }
+        .shadow(color: RecipeTheme.shadow.opacity(0.55), radius: 10, y: 6)
+    }
+
+    @ViewBuilder
+    private var previewImage: some View {
+        ZStack {
             if let imageData = viewModel.selectedImageData,
                let image = UIImage(data: imageData) {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
-                    .frame(maxWidth: .infinity, minHeight: 160, maxHeight: 160, alignment: .center)
-                    .clipped()
-                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-            }
-
-            if !viewModel.draft.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                Text(viewModel.draft.title)
-                    .font(.system(size: 18, weight: .bold, design: .rounded))
-            }
-
-            if !viewModel.draft.description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                Text(viewModel.draft.description)
-                    .font(.system(size: 14, weight: .medium, design: .rounded))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(4)
+            } else {
+                RemoteRecipeImage(imageURL: nil, width: nil, height: 210, placeholderStyle: .pattern("RecipeDetailPattern"))
             }
         }
-        .padding(.vertical, 4)
+        .frame(maxWidth: .infinity, minHeight: 210, maxHeight: 210)
+        .clipped()
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay(alignment: .bottomLeading) {
+            Text(viewModel.selectedImageData == nil ? "Image from metadata" : "Custom image selected")
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color.black.opacity(0.34))
+                .clipShape(Capsule())
+                .padding(12)
+        }
+    }
+
+    private func inputSection<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .foregroundStyle(RecipeTheme.textPrimary)
+
+            content()
+        }
     }
 }
 
@@ -161,7 +255,7 @@ private struct CategorySelectionGrid: View {
                             selectedCategories.append(category)
                         }
                     } label: {
-                        CategoryPill(title: category, isSelected: isSelected)
+                        CategoryPill(title: category, isSelected: isSelected, style: .outlined)
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.plain)

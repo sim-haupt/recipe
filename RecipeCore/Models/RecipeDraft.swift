@@ -5,6 +5,9 @@ struct RecipeDraft: Identifiable, Codable, Hashable {
     var title: String
     var description: String
     var rawText: String
+    var ingredients: [String]
+    var preparationSteps: [String]
+    var notes: [String]
     var sourceURL: String?
     var imageFileName: String?
     var categories: [String]
@@ -23,6 +26,9 @@ struct RecipeDraft: Identifiable, Codable, Hashable {
         title: String,
         description: String,
         rawText: String = "",
+        ingredients: [String] = [],
+        preparationSteps: [String] = [],
+        notes: [String] = [],
         sourceURL: String?,
         imageFileName: String?,
         category: String? = nil,
@@ -36,6 +42,9 @@ struct RecipeDraft: Identifiable, Codable, Hashable {
         self.title = title
         self.description = description
         self.rawText = rawText
+        self.ingredients = ingredients
+        self.preparationSteps = preparationSteps
+        self.notes = notes
         self.sourceURL = sourceURL
         self.imageFileName = imageFileName
         self.categories = categories.isEmpty ? (category.map { [$0] } ?? []) : categories
@@ -50,6 +59,9 @@ struct RecipeDraft: Identifiable, Codable, Hashable {
         case title
         case description
         case rawText
+        case ingredients
+        case preparationSteps
+        case notes
         case sourceURL
         case imageFileName
         case category
@@ -66,6 +78,9 @@ struct RecipeDraft: Identifiable, Codable, Hashable {
         title = try container.decode(String.self, forKey: .title)
         description = try container.decode(String.self, forKey: .description)
         rawText = try container.decodeIfPresent(String.self, forKey: .rawText) ?? ""
+        ingredients = try container.decodeIfPresent([String].self, forKey: .ingredients) ?? []
+        preparationSteps = try container.decodeIfPresent([String].self, forKey: .preparationSteps) ?? []
+        notes = try container.decodeIfPresent([String].self, forKey: .notes) ?? []
         sourceURL = try container.decodeIfPresent(String.self, forKey: .sourceURL)
         imageFileName = try container.decodeIfPresent(String.self, forKey: .imageFileName)
         let decodedCategories = try container.decodeIfPresent([String].self, forKey: .categories)
@@ -83,6 +98,9 @@ struct RecipeDraft: Identifiable, Codable, Hashable {
         try container.encode(title, forKey: .title)
         try container.encode(description, forKey: .description)
         try container.encode(rawText, forKey: .rawText)
+        try container.encode(ingredients, forKey: .ingredients)
+        try container.encode(preparationSteps, forKey: .preparationSteps)
+        try container.encode(notes, forKey: .notes)
         try container.encodeIfPresent(sourceURL, forKey: .sourceURL)
         try container.encodeIfPresent(imageFileName, forKey: .imageFileName)
         try container.encode(categories, forKey: .categories)
@@ -98,6 +116,9 @@ struct RecipeDraft: Identifiable, Codable, Hashable {
         title: "",
         description: "",
         rawText: "",
+        ingredients: [],
+        preparationSteps: [],
+        notes: [],
         sourceURL: nil,
         imageFileName: nil,
         categories: [],
