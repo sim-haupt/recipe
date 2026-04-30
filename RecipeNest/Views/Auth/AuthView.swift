@@ -14,7 +14,7 @@ struct AuthView: View {
 
                 VStack(alignment: .leading, spacing: 24) {
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("RecipeNest")
+                        Text("WeCookin'")
                             .font(.system(size: 38, weight: .bold, design: .rounded))
                         Text("Save recipes from the web, share a household cookbook, and keep notes together.")
                             .font(.system(size: 15, weight: .medium, design: .rounded))

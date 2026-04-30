@@ -96,6 +96,8 @@ final class FirestoreRecipeService: RecipeServicing {
             "createdByUserID": author.id,
             "createdByName": author.displayName,
             "updatedAt": Timestamp(date: now),
+            "category": input.category ?? NSNull(),
+            "categories": input.categories,
             "tagIDs": tags.map(\.id),
             "tagNames": tags.map(\.name),
             "isFavorite": false,
@@ -109,6 +111,7 @@ final class FirestoreRecipeService: RecipeServicing {
                 "authorID": author.id,
                 "authorName": author.displayName,
                 "text": input.initialComment,
+                "imageURL": NSNull(),
                 "createdAt": Timestamp(date: now)
             ])
         }
@@ -135,6 +138,41 @@ final class FirestoreRecipeService: RecipeServicing {
         ], merge: true)
     }
 
+    func updateRecipe(recipe: Recipe, householdID: String, title: String, description: String, sourceURL: String, categories: [String], tagNames: [String], imageData: Data?) async throws {
+        let tags = try await ensureTags(tagNames: tagNames, householdID: householdID)
+        let imageURL = try await uploadImageIfNeeded(imageData, householdID: householdID, recipeID: recipe.id)
+        var payload: [String: Any] = [
+            "title": title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? recipe.title : title.trimmingCharacters(in: .whitespacesAndNewlines),
+            "description": description,
+            "sourceURL": sourceURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? NSNull() : sourceURL.trimmingCharacters(in: .whitespacesAndNewlines),
+            "category": categories.first ?? NSNull(),
+            "categories": categories,
+            "tagIDs": tags.map(\.id),
+            "tagNames": tags.map(\.name),
+            "updatedAt": Timestamp(date: Date())
+        ]
+        if let imageURL {
+            payload["imageURL"] = imageURL
+        }
+        try await recipesCollection(householdID: householdID).document(recipe.id).setData(payload, merge: true)
+    }
+
+    func deleteRecipe(recipe: Recipe, householdID: String) async throws {
+        let recipeRef = recipesCollection(householdID: householdID).document(recipe.id)
+
+        let commentDocs = try await commentsCollection(householdID: householdID, recipeID: recipe.id).getDocuments().documents
+        for document in commentDocs {
+            try await document.reference.delete()
+        }
+
+        let reviewDocs = try await reviewsCollection(householdID: householdID, recipeID: recipe.id).getDocuments().documents
+        for document in reviewDocs {
+            try await document.reference.delete()
+        }
+
+        try await recipeRef.delete()
+    }
+
     func updateFavorite(recipe: Recipe, householdID: String, isFavorite: Bool) async throws {
         try await recipesCollection(householdID: householdID).document(recipe.id).setData([
             "isFavorite": isFavorite,
@@ -142,15 +180,19 @@ final class FirestoreRecipeService: RecipeServicing {
         ], merge: true)
     }
 
-    func addComment(recipe: Recipe, householdID: String, text: String, author: UserProfile) async throws {
+    func addComment(recipe: Recipe, householdID: String, text: String, imageData: Data?, author: UserProfile) async throws {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
+        guard !trimmed.isEmpty || imageData != nil else { return }
 
-        try await commentsCollection(householdID: householdID, recipeID: recipe.id).document().setData([
+        let commentRef = commentsCollection(householdID: householdID, recipeID: recipe.id).document()
+        let imageURL = try await uploadCommentImageIfNeeded(imageData, householdID: householdID, recipeID: recipe.id, commentID: commentRef.documentID)
+
+        try await commentRef.setData([
             "recipeID": recipe.id,
             "authorID": author.id,
             "authorName": author.displayName,
             "text": trimmed,
+            "imageURL": imageURL ?? NSNull(),
             "createdAt": Timestamp(date: Date())
         ])
     }
@@ -224,6 +266,14 @@ final class FirestoreRecipeService: RecipeServicing {
         _ = try await reference.putDataAwaitingResult(data)
         return try await reference.downloadURLAwaitingResult().absoluteString
     }
+
+    private func uploadCommentImageIfNeeded(_ data: Data?, householdID: String, recipeID: String, commentID: String) async throws -> String? {
+        guard let data else { return nil }
+
+        let reference = storage.reference(withPath: "households/\(householdID)/recipes/\(recipeID)/comments/\(commentID).jpg")
+        _ = try await reference.putDataAwaitingResult(data)
+        return try await reference.downloadURLAwaitingResult().absoluteString
+    }
 }
 
 private final class FirestoreRealtimeListener: RealtimeListening {
@@ -256,6 +306,7 @@ private func mapRecipe(_ document: QueryDocumentSnapshot) -> Recipe {
         createdByUserID: data["createdByUserID"] as? String ?? "",
         createdByName: data["createdByName"] as? String ?? "",
         updatedAt: (data["updatedAt"] as? Timestamp)?.dateValue() ?? Date(),
+        categories: data["categories"] as? [String] ?? ((data["category"] as? String).map { [$0] } ?? []),
         tagIDs: data["tagIDs"] as? [String] ?? [],
         tagNames: data["tagNames"] as? [String] ?? [],
         isFavorite: data["isFavorite"] as? Bool ?? false,
@@ -284,6 +335,7 @@ private func mapComment(_ document: QueryDocumentSnapshot) -> Comment {
         authorID: data["authorID"] as? String ?? "",
         authorName: data["authorName"] as? String ?? "",
         text: data["text"] as? String ?? "",
+        imageURL: data["imageURL"] as? String,
         createdAt: (data["createdAt"] as? Timestamp)?.dateValue() ?? Date()
     )
 }

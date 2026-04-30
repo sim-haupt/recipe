@@ -1,6 +1,7 @@
 import SwiftUI
 
 enum RecipeTheme {
+    static let accentBase = Color(red: 74 / 255, green: 194 / 255, blue: 116 / 255)
     static let background = Color(uiColor: UIColor { traits in
         traits.userInterfaceStyle == .dark
             ? UIColor(red: 0.08, green: 0.11, blue: 0.12, alpha: 1)
@@ -16,11 +17,12 @@ enum RecipeTheme {
             ? UIColor(red: 0.16, green: 0.19, blue: 0.20, alpha: 1)
             : UIColor(red: 0.95, green: 0.98, blue: 0.97, alpha: 1)
     })
-    static let accent = Color(red: 0.35, green: 0.78, blue: 0.68)
-    static let accentStrong = Color(red: 0.22, green: 0.66, blue: 0.57)
-    static let accentSoft = Color(red: 0.87, green: 0.97, blue: 0.94)
-    static let accentWash = Color(red: 0.93, green: 0.99, blue: 0.97)
-    static let mintShadow = Color(red: 0.24, green: 0.55, blue: 0.49).opacity(0.18)
+    static let accent = accentBase
+    static let accentStrong = accentBase
+    static let accentSoft = Color(red: 0.86, green: 0.96, blue: 0.89)
+    static let accentWash = Color(red: 0.92, green: 0.98, blue: 0.94)
+    static let mintShadow = Color(red: 0.17, green: 0.45, blue: 0.28).opacity(0.18)
+    static let textOnAccent = Color.white
     static let textPrimary = Color.primary
     static let textSecondary = Color.secondary
     static let shadow = Color.black.opacity(0.08)
@@ -32,10 +34,13 @@ enum RecipeTheme {
             : UIColor(red: 0.98, green: 0.99, blue: 0.98, alpha: 1)
     })
     static let strokeSoft = Color.white.opacity(0.55)
-    static let heroGlow = Color(red: 0.20, green: 0.52, blue: 0.45).opacity(0.24)
+    static let heroGlow = Color(red: 0.23, green: 0.54, blue: 0.32).opacity(0.24)
 
     static let heroGradient = LinearGradient(
-        colors: [accent, accentStrong],
+        colors: [
+            Color(red: 0.42, green: 0.82, blue: 0.53),
+            accentStrong
+        ],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
     )
@@ -48,8 +53,8 @@ enum RecipeTheme {
 
     static let homeBackdrop = LinearGradient(
         colors: [
-            Color(red: 0.90, green: 0.98, blue: 0.95),
-            Color(red: 0.97, green: 0.98, blue: 0.97)
+            Color(red: 0.91, green: 0.98, blue: 0.93),
+            Color(red: 0.97, green: 0.99, blue: 0.96)
         ],
         startPoint: .top,
         endPoint: .bottom

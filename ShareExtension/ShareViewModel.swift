@@ -4,14 +4,13 @@ import Foundation
 final class ShareViewModel: ObservableObject {
     enum Step: Int {
         case details
-        case tags
+        case category
     }
 
     @Published var title = ""
     @Published var description = ""
     @Published var sourceURL = ""
-    @Published var tagEntry = ""
-    @Published var tags: [String] = []
+    @Published var selectedCategories = Set<String>()
     @Published var imageData: Data?
     @Published var isLoading = true
     @Published var isSaving = false
@@ -41,19 +40,8 @@ final class ShareViewModel: ObservableObject {
         isLoading = false
     }
 
-    func addTag() {
-        let cleaned = tagEntry.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !cleaned.isEmpty, !tags.contains(cleaned) else { return }
-        tags.append(cleaned)
-        tagEntry = ""
-    }
-
-    func removeTag(_ tag: String) {
-        tags.removeAll { $0 == tag }
-    }
-
     func goToNextStep() {
-        currentStep = .tags
+        currentStep = .category
     }
 
     func goBack() {
@@ -71,7 +59,8 @@ final class ShareViewModel: ObservableObject {
                 description: description.trimmingCharacters(in: .whitespacesAndNewlines),
                 sourceURL: sourceURL.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
                 imageFileName: nil,
-                tags: tags,
+                categories: selectedCategories.sorted(),
+                tags: [],
                 savedDate: Date(),
                 importedAt: nil,
                 createdByUser: nil

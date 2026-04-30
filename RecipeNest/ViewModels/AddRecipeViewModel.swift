@@ -2,8 +2,7 @@ import Foundation
 
 @MainActor
 final class AddRecipeViewModel: ObservableObject {
-    @Published var draft = RecipeComposerDraft(title: "", description: "", sourceURL: "", tags: [], comments: "", rating: 0)
-    @Published var tagEntry = ""
+    @Published var draft = RecipeComposerDraft(title: "", description: "", sourceURL: "", categories: [], tags: [], comments: "", rating: 0)
     @Published var isSaving = false
     @Published var isImportingURL = false
     @Published var errorMessage: String?
@@ -17,17 +16,6 @@ final class AddRecipeViewModel: ObservableObject {
     init(environment: AppEnvironment, userProfile: UserProfile) {
         self.environment = environment
         self.userProfile = userProfile
-    }
-
-    func addTag() {
-        let cleaned = tagEntry.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !cleaned.isEmpty, !draft.tags.contains(cleaned) else { return }
-        draft.tags.append(cleaned)
-        tagEntry = ""
-    }
-
-    func removeTag(_ tag: String) {
-        draft.tags.removeAll { $0 == tag }
     }
 
     func scheduleURLImport() {
@@ -97,6 +85,7 @@ final class AddRecipeViewModel: ObservableObject {
                 title: draft.title.trimmingCharacters(in: .whitespacesAndNewlines),
                 description: draft.description.trimmingCharacters(in: .whitespacesAndNewlines),
                 sourceURL: draft.sourceURL.trimmingCharacters(in: .whitespacesAndNewlines),
+                categories: draft.categories,
                 tagNames: draft.tags,
                 imageData: selectedImageData,
                 initialComment: draft.comments.trimmingCharacters(in: .whitespacesAndNewlines),

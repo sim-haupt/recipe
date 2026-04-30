@@ -19,6 +19,7 @@ struct AddRecipeView: View {
                         .keyboardType(.URL)
                         .textContentType(.URL)
                         .submitLabel(.go)
+                        .recipeFormInputStyle()
                         .onSubmit {
                             Task {
                                 await viewModel.fetchMetadataFromSourceURL(force: true)
@@ -41,19 +42,13 @@ struct AddRecipeView: View {
                     }
                 }
 
-                Section("Tags") {
-                    HStack {
-                        TextField("Add tag", text: $viewModel.tagEntry)
-                        Button("Add", action: viewModel.addTag)
-                    }
-
-                    FlowTagList(tags: viewModel.draft.tags) { tag in
-                        viewModel.removeTag(tag)
-                    }
+                Section("Categories") {
+                    CategorySelectionGrid(selectedCategories: $viewModel.draft.categories)
                 }
             }
             .scrollContentBackground(.hidden)
             .background(RecipeTheme.pageGradient.ignoresSafeArea())
+            .listRowBackground(Color.clear)
             .navigationTitle("Add Recipe")
             .navigationBarTitleDisplayMode(.inline)
             .tint(RecipeTheme.accentStrong)
@@ -117,5 +112,65 @@ struct AddRecipeView: View {
             }
         }
         .padding(.vertical, 4)
+    }
+}
+
+private extension View {
+    func recipeFormInputStyle(minHeight: CGFloat = 56) -> some View {
+        self
+            .font(.system(size: 16, weight: .medium, design: .rounded))
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .frame(maxWidth: .infinity, minHeight: minHeight, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(Color.white.opacity(0.96))
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(Color.black.opacity(0.06), lineWidth: 1)
+            }
+            .shadow(color: RecipeTheme.mintShadow.opacity(0.42), radius: 12, y: 6)
+    }
+}
+
+private struct CategorySelectionGrid: View {
+    @Binding var selectedCategories: [String]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(selectedCategories.isEmpty ? "Choose one or more categories" : selectedCategories.joined(separator: ", "))
+                .font(.system(size: 14, weight: .medium, design: .rounded))
+                .foregroundStyle(.secondary)
+
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 10)], spacing: 10) {
+                ForEach(RecipeCategory.allTitles, id: \.self) { category in
+                    let isSelected = selectedCategories.contains(category)
+                    Button {
+                        if isSelected {
+                            selectedCategories.removeAll { $0 == category }
+                        } else {
+                            selectedCategories.append(category)
+                        }
+                    } label: {
+                        Text(category)
+                            .font(.system(size: 13, weight: .semibold, design: .rounded))
+                            .foregroundStyle(RecipeCategory.color(for: category))
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 10)
+                            .frame(maxWidth: .infinity)
+                            .background(
+                                Capsule()
+                                    .fill(RecipeCategory.fillColor(for: category, isSelected: isSelected))
+                            )
+                            .overlay {
+                                Capsule()
+                                    .stroke(RecipeCategory.strokeColor(for: category, isSelected: isSelected), lineWidth: 1)
+                            }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
     }
 }

@@ -29,6 +29,7 @@ final class DemoAuthService: AuthServicing {
         let user = store.users.values.first { $0.email.caseInsensitiveCompare(email) == .orderedSame }
         if let user {
             store.currentUserID = user.id
+            store.saveSnapshotIfPossible()
             store.notifyAuthObservers()
         } else {
             throw NSError(domain: "RecipeNestDemo", code: 401, userInfo: [NSLocalizedDescriptionKey: "Demo mode could not find that user."])
@@ -48,12 +49,14 @@ final class DemoAuthService: AuthServicing {
         )
         store.users[userID] = user
         store.currentUserID = userID
+        store.saveSnapshotIfPossible()
         store.notifyAuthObservers()
         return userID
     }
 
     func signOut() throws {
         store.currentUserID = nil
+        store.saveSnapshotIfPossible()
         store.notifyAuthObservers()
     }
 }
@@ -81,6 +84,7 @@ final class DemoHouseholdService: HouseholdServicing {
             createdAt: now,
             updatedAt: now
         )
+        store.saveSnapshotIfPossible()
     }
 
     func createHousehold(name: String, owner: UserProfile) async throws -> Household {
@@ -105,6 +109,7 @@ final class DemoHouseholdService: HouseholdServicing {
 
         store.recipesByHousehold[householdID] = []
         store.tagsByHousehold[householdID] = []
+        store.saveSnapshotIfPossible()
         store.notifyAuthObservers()
         store.notifyRecipes(householdID: householdID)
         store.notifyTags(householdID: householdID)
@@ -127,6 +132,7 @@ final class DemoHouseholdService: HouseholdServicing {
         updatedUser.updatedAt = Date()
         store.users[user.id] = updatedUser
 
+        store.saveSnapshotIfPossible()
         store.notifyAuthObservers()
         return updatedHousehold
     }
@@ -182,7 +188,7 @@ final class DemoRecipeService: RecipeServicing {
         let now = Date()
         let tags = ensureTags(tagNames: input.tagNames, householdID: householdID)
         let recipeID = UUID().uuidString
-        let imageURL = try input.imageData.map { try store.persistImageData($0, recipeID: recipeID) }
+        let imageURL = try input.imageData.map { try store.persistImageData($0, fileName: recipeID) }
 
         var recipes = store.recipesByHousehold[householdID] ?? []
         let recipe = Recipe(
@@ -196,6 +202,7 @@ final class DemoRecipeService: RecipeServicing {
             createdByUserID: author.id,
             createdByName: author.displayName,
             updatedAt: now,
+            categories: input.categories,
             tagIDs: tags.map(\.id),
             tagNames: tags.map(\.name),
             isFavorite: false,
@@ -206,12 +213,13 @@ final class DemoRecipeService: RecipeServicing {
         store.recipesByHousehold[householdID] = recipes
 
         if !input.initialComment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            try await addComment(recipe: recipe, householdID: householdID, text: input.initialComment, author: author)
+            try await addComment(recipe: recipe, householdID: householdID, text: input.initialComment, imageData: nil, author: author)
         }
 
         if input.initialRating > 0 {
             try await upsertReview(recipe: recipe, householdID: householdID, rating: input.initialRating, note: input.initialComment, author: author)
         } else {
+            store.saveSnapshotIfPossible()
             store.notifyRecipes(householdID: householdID)
         }
     }
@@ -225,8 +233,43 @@ final class DemoRecipeService: RecipeServicing {
         recipes[index].tagNames = tags.map(\.name)
         recipes[index].updatedAt = Date()
         store.recipesByHousehold[householdID] = recipes
+        store.saveSnapshotIfPossible()
         store.notifyRecipes(householdID: householdID)
         store.notifyTags(householdID: householdID)
+    }
+
+    func updateRecipe(recipe: Recipe, householdID: String, title: String, description: String, sourceURL: String, categories: [String], tagNames: [String], imageData: Data?) async throws {
+        let tags = ensureTags(tagNames: tagNames, householdID: householdID)
+        guard var recipes = store.recipesByHousehold[householdID],
+              let index = recipes.firstIndex(where: { $0.id == recipe.id }) else { return }
+
+        recipes[index].title = title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? recipe.title : title.trimmingCharacters(in: .whitespacesAndNewlines)
+        recipes[index].description = description
+        recipes[index].sourceURL = sourceURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : sourceURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        recipes[index].categories = categories
+        recipes[index].tagIDs = tags.map(\.id)
+        recipes[index].tagNames = tags.map(\.name)
+        if let imageData {
+            recipes[index].imageURL = try store.persistImageData(imageData, fileName: recipe.id)
+        }
+        recipes[index].updatedAt = Date()
+        store.recipesByHousehold[householdID] = recipes
+        store.saveSnapshotIfPossible()
+        store.notifyRecipes(householdID: householdID)
+        store.notifyTags(householdID: householdID)
+    }
+
+    func deleteRecipe(recipe: Recipe, householdID: String) async throws {
+        guard var recipes = store.recipesByHousehold[householdID] else { return }
+        recipes.removeAll { $0.id == recipe.id }
+        store.recipesByHousehold[householdID] = recipes
+        let key = store.recipeKey(householdID: householdID, recipeID: recipe.id)
+        store.commentsByRecipeKey[key] = nil
+        store.reviewsByRecipeKey[key] = nil
+        store.saveSnapshotIfPossible()
+        store.notifyRecipes(householdID: householdID)
+        store.notifyComments(householdID: householdID, recipeID: recipe.id)
+        store.notifyReviews(householdID: householdID, recipeID: recipe.id)
     }
 
     func updateFavorite(recipe: Recipe, householdID: String, isFavorite: Bool) async throws {
@@ -236,23 +279,28 @@ final class DemoRecipeService: RecipeServicing {
         recipes[index].isFavorite = isFavorite
         recipes[index].updatedAt = Date()
         store.recipesByHousehold[householdID] = recipes
+        store.saveSnapshotIfPossible()
         store.notifyRecipes(householdID: householdID)
     }
 
-    func addComment(recipe: Recipe, householdID: String, text: String, author: UserProfile) async throws {
+    func addComment(recipe: Recipe, householdID: String, text: String, imageData: Data?, author: UserProfile) async throws {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
+        guard !trimmed.isEmpty || imageData != nil else { return }
         let key = store.recipeKey(householdID: householdID, recipeID: recipe.id)
         var comments = store.commentsByRecipeKey[key] ?? []
+        let commentID = UUID().uuidString
+        let imageURL = try imageData.map { try store.persistImageData($0, fileName: commentID) }
         comments.append(Comment(
-            id: UUID().uuidString,
+            id: commentID,
             recipeID: recipe.id,
             authorID: author.id,
             authorName: author.displayName,
             text: trimmed,
+            imageURL: imageURL,
             createdAt: Date()
         ))
         store.commentsByRecipeKey[key] = comments
+        store.saveSnapshotIfPossible()
         store.notifyComments(householdID: householdID, recipeID: recipe.id)
     }
 
@@ -291,6 +339,7 @@ final class DemoRecipeService: RecipeServicing {
         recipes[index].updatedAt = Date()
         store.recipesByHousehold[householdID] = recipes
 
+        store.saveSnapshotIfPossible()
         store.notifyReviews(householdID: householdID, recipeID: recipe.id)
         store.notifyRecipes(householdID: householdID)
     }
@@ -308,6 +357,7 @@ final class DemoRecipeService: RecipeServicing {
 
         tags.sort { $0.name < $1.name }
         store.tagsByHousehold[householdID] = tags
+        store.saveSnapshotIfPossible()
         store.notifyTags(householdID: householdID)
 
         return tagNames

@@ -2,6 +2,17 @@ import Foundation
 
 final class DemoDataStore {
     static let shared = DemoDataStore()
+    private static let imageReferencePrefix = "demo-image:"
+
+    private struct Snapshot: Codable {
+        var currentUserID: String?
+        var users: [String: UserProfile]
+        var households: [String: Household]
+        var recipesByHousehold: [String: [Recipe]]
+        var tagsByHousehold: [String: [Tag]]
+        var commentsByRecipeKey: [String: [Comment]]
+        var reviewsByRecipeKey: [String: [Review]]
+    }
 
     var currentUserID: String?
     var authObservers: [UUID: (AuthSession?) -> Void] = [:]
@@ -18,16 +29,37 @@ final class DemoDataStore {
     var commentObservers: [String: [UUID: (Result<[Comment], Error>) -> Void]] = [:]
     var reviewObservers: [String: [UUID: (Result<[Review], Error>) -> Void]] = [:]
 
+    private var hasLoadedInitialData = false
+
     private init() {}
 
-    func persistImageData(_ data: Data, recipeID: String) throws -> String {
-        let fileURL = try imageDirectoryURL().appendingPathComponent("\(recipeID).jpg")
+    func persistImageData(_ data: Data, fileName: String) throws -> String {
+        let storedFileName = "\(fileName).jpg"
+        let fileURL = try imageDirectoryURL().appendingPathComponent(storedFileName)
         try data.write(to: fileURL, options: .atomic)
-        return fileURL.absoluteString
+        return Self.imageReferencePrefix + storedFileName
+    }
+
+    func resolvedImageURL(for reference: String) -> URL? {
+        if reference.hasPrefix(Self.imageReferencePrefix) {
+            let fileName = String(reference.dropFirst(Self.imageReferencePrefix.count))
+            return try? imageDirectoryURL().appendingPathComponent(fileName)
+        }
+
+        if let url = URL(string: reference), url.isFileURL {
+            return url
+        }
+
+        return nil
     }
 
     func seedIfNeeded() {
-        guard users.isEmpty, households.isEmpty else { return }
+        guard !hasLoadedInitialData else { return }
+        hasLoadedInitialData = true
+
+        if loadSnapshotIfPresent() {
+            return
+        }
 
         let now = Date()
         let userID = "demo-user"
@@ -69,6 +101,7 @@ final class DemoDataStore {
             createdByUserID: userID,
             createdByName: user.displayName,
             updatedAt: now,
+            category: RecipeCategory.pastaAndRice.rawValue,
             tagIDs: tags.map(\.id),
             tagNames: tags.map(\.name),
             isFavorite: true,
@@ -82,6 +115,7 @@ final class DemoDataStore {
             authorID: userID,
             authorName: user.displayName,
             text: "Demo mode is active because Firebase is not configured yet.",
+            imageURL: nil,
             createdAt: now
         )
 
@@ -102,6 +136,8 @@ final class DemoDataStore {
         recipesByHousehold[householdID] = [recipe]
         commentsByRecipeKey[recipeKey(householdID: householdID, recipeID: recipe.id)] = [comment]
         reviewsByRecipeKey[recipeKey(householdID: householdID, recipeID: recipe.id)] = [review]
+        currentUserID = userID
+        saveSnapshotIfPossible()
     }
 
     func recipeKey(householdID: String, recipeID: String) -> String {
@@ -138,6 +174,10 @@ final class DemoDataStore {
         reviewObservers[key]?.values.forEach { $0(payload) }
     }
 
+    func saveSnapshotIfPossible() {
+        try? saveSnapshot()
+    }
+
     private func imageDirectoryURL() throws -> URL {
         let fileManager = FileManager.default
         guard let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
@@ -147,5 +187,48 @@ final class DemoDataStore {
         let directory = appSupport.appendingPathComponent("RecipeNestDemoImages", isDirectory: true)
         try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
         return directory
+    }
+
+    private func snapshotFileURL() throws -> URL {
+        let fileManager = FileManager.default
+        guard let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+            throw NSError(domain: "RecipeNestDemo", code: 500, userInfo: [NSLocalizedDescriptionKey: "Could not access demo storage."])
+        }
+
+        let directory = appSupport.appendingPathComponent("RecipeNestDemoStore", isDirectory: true)
+        try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory.appendingPathComponent("snapshot.json")
+    }
+
+    private func loadSnapshotIfPresent() -> Bool {
+        guard let fileURL = try? snapshotFileURL(),
+              let data = try? Data(contentsOf: fileURL),
+              let snapshot = try? JSONDecoder().decode(Snapshot.self, from: data) else {
+            return false
+        }
+
+        currentUserID = snapshot.currentUserID
+        users = snapshot.users
+        households = snapshot.households
+        recipesByHousehold = snapshot.recipesByHousehold
+        tagsByHousehold = snapshot.tagsByHousehold
+        commentsByRecipeKey = snapshot.commentsByRecipeKey
+        reviewsByRecipeKey = snapshot.reviewsByRecipeKey
+        return true
+    }
+
+    private func saveSnapshot() throws {
+        let snapshot = Snapshot(
+            currentUserID: currentUserID,
+            users: users,
+            households: households,
+            recipesByHousehold: recipesByHousehold,
+            tagsByHousehold: tagsByHousehold,
+            commentsByRecipeKey: commentsByRecipeKey,
+            reviewsByRecipeKey: reviewsByRecipeKey
+        )
+
+        let data = try JSONEncoder().encode(snapshot)
+        try data.write(to: snapshotFileURL(), options: .atomic)
     }
 }

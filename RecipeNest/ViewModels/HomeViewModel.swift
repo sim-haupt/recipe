@@ -1,11 +1,15 @@
 import Foundation
 
+struct HomeSearchSuggestion: Identifiable, Hashable {
+    let id: String
+    let title: String
+    let subtitle: String
+}
+
 @MainActor
 final class HomeViewModel: ObservableObject {
     @Published var recipes: [Recipe] = []
-    @Published var tags: [Tag] = []
     @Published var searchText = ""
-    @Published var selectedTags = Set<String>()
     @Published var errorMessage: String?
     @Published var isShowingAddRecipe = false
 
@@ -13,28 +17,42 @@ final class HomeViewModel: ObservableObject {
     private let userProfile: UserProfile
     private var isImportingPendingDrafts = false
     private var recipeListener: RealtimeListening?
-    private var tagListener: RealtimeListening?
 
     init(environment: AppEnvironment, userProfile: UserProfile) {
         self.environment = environment
         self.userProfile = userProfile
     }
 
-    var filteredRecipes: [Recipe] {
-        recipes.filter { recipe in
-            let matchesSearch = searchText.isEmpty
-                || recipe.title.localizedCaseInsensitiveContains(searchText)
-                || recipe.description.localizedCaseInsensitiveContains(searchText)
+    var searchSuggestions: [HomeSearchSuggestion] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return [] }
 
-            let matchesTags = selectedTags.isEmpty
-                || !selectedTags.isDisjoint(with: Set(recipe.tagNames))
+        return recipes
+            .filter { recipeMatchesSearch($0, query: query) }
+            .sorted { lhs, rhs in
+                if lhs.savedDate == rhs.savedDate {
+                    return lhs.title < rhs.title
+                }
+                return lhs.savedDate > rhs.savedDate
+            }
+            .prefix(5)
+            .map { recipe in
+                HomeSearchSuggestion(
+                    id: recipe.id,
+                    title: recipe.title,
+                    subtitle: !recipe.categories.isEmpty
+                        ? "\(recipe.categories.joined(separator: ", ")) • \(recipe.createdByName)"
+                        : "by \(recipe.createdByName)"
+                )
+            }
+    }
 
-            return matchesSearch && matchesTags
-        }
+    func recipe(for suggestion: HomeSearchSuggestion) -> Recipe? {
+        recipes.first { $0.id == suggestion.id }
     }
 
     var favoriteRecipes: [Recipe] {
-        filteredRecipes
+        recipes
             .filter(\.isFavorite)
             .sorted { lhs, rhs in
                 if lhs.updatedAt == rhs.updatedAt {
@@ -44,12 +62,14 @@ final class HomeViewModel: ObservableObject {
             }
     }
 
+    var allRecipesSorted: [Recipe] {
+        recipes.sorted { $0.savedDate > $1.savedDate }
+    }
+
     func start() {
         guard let householdID = userProfile.activeHouseholdID else { return }
 
         recipeListener?.remove()
-        tagListener?.remove()
-
         recipeListener = environment.recipeService.observeRecipes(householdID: householdID) { [weak self] result in
             Task { @MainActor in
                 switch result {
@@ -61,27 +81,8 @@ final class HomeViewModel: ObservableObject {
             }
         }
 
-        tagListener = environment.recipeService.observeTags(householdID: householdID) { [weak self] result in
-            Task { @MainActor in
-                switch result {
-                case .success(let tags):
-                    self?.tags = tags
-                case .failure(let error):
-                    self?.errorMessage = error.localizedDescription
-                }
-            }
-        }
-
         Task {
             await importPendingDraftsIfNeeded()
-        }
-    }
-
-    func toggle(tag: Tag) {
-        if selectedTags.contains(tag.name) {
-            selectedTags.remove(tag.name)
-        } else {
-            selectedTags.insert(tag.name)
         }
     }
 
@@ -93,6 +94,21 @@ final class HomeViewModel: ObservableObject {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    func applySearchSuggestion(_ suggestion: HomeSearchSuggestion) {
+        searchText = suggestion.title
+    }
+
+    func searchResults(for query: String) -> [Recipe] {
+        searchResults(in: allRecipesSorted, query: query)
+    }
+
+    func searchResults(in sourceRecipes: [Recipe], query: String) -> [Recipe] {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return sourceRecipes }
+
+        return sourceRecipes.filter { recipeMatchesSearch($0, query: trimmed) }
     }
 
     func importPendingDraftsIfNeeded() async {
@@ -110,6 +126,7 @@ final class HomeViewModel: ObservableObject {
                     title: draft.title,
                     description: draft.description,
                     sourceURL: draft.sourceURL ?? "",
+                    categories: draft.categories,
                     tagNames: draft.tags,
                     imageData: environment.sharedDraftStore.imageData(for: draft),
                     initialComment: "",
@@ -124,5 +141,13 @@ final class HomeViewModel: ObservableObject {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    private func recipeMatchesSearch(_ recipe: Recipe, query: String) -> Bool {
+        recipe.title.localizedCaseInsensitiveContains(query)
+            || recipe.description.localizedCaseInsensitiveContains(query)
+            || recipe.createdByName.localizedCaseInsensitiveContains(query)
+            || recipe.categories.contains(where: { $0.localizedCaseInsensitiveContains(query) })
+            || recipe.tagNames.contains(where: { $0.localizedCaseInsensitiveContains(query) })
     }
 }

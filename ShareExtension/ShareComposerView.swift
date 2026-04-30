@@ -28,7 +28,7 @@ struct ShareComposerView: View {
                             if viewModel.currentStep == .details {
                                 detailStep
                             } else {
-                                tagStep
+                                categoryStep
                             }
 
                             Text("Some apps only share a link, caption text, or a low-resolution thumbnail. Instagram and other third-party apps may not expose the full recipe metadata.")
@@ -78,11 +78,11 @@ struct ShareComposerView: View {
 
     private var stepHeader: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(viewModel.currentStep == .details ? "Review Import" : "Add Tags")
+            Text(viewModel.currentStep == .details ? "Review Import" : "Choose Categories")
                 .font(.system(size: 28, weight: .bold, design: .rounded))
             Text(viewModel.currentStep == .details
                  ? "Edit anything the source app did not provide cleanly before saving."
-                 : "Add a few tags now so this recipe is easy to find on the home screen.")
+                 : "Pick one or more categories now so this recipe is easy to browse later.")
                 .foregroundStyle(.secondary)
         }
     }
@@ -115,15 +115,33 @@ struct ShareComposerView: View {
         }
     }
 
-    private var tagStep: some View {
+    private var categoryStep: some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                TextField("Add tag", text: $viewModel.tagEntry)
-                    .textFieldStyle(.roundedBorder)
-                Button("Add", action: viewModel.addTag)
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 10)], spacing: 10) {
+                ForEach(RecipeCategory.allTitles, id: \.self) { category in
+                    let isSelected = viewModel.selectedCategories.contains(category)
+                    Button {
+                        if isSelected {
+                            viewModel.selectedCategories.remove(category)
+                        } else {
+                            viewModel.selectedCategories.insert(category)
+                        }
+                    } label: {
+                        Text(category)
+                            .font(.system(size: 13, weight: .semibold, design: .rounded))
+                            .foregroundStyle(RecipeCategory.color(for: category))
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 10)
+                            .frame(maxWidth: .infinity)
+                            .background(categoryBackground(category: category, isSelected: isSelected))
+                            .overlay {
+                                Capsule()
+                                    .stroke(RecipeCategory.strokeColor(for: category, isSelected: isSelected), lineWidth: 1)
+                            }
+                    }
+                    .buttonStyle(.plain)
+                }
             }
-
-            ShareFlowTagList(tags: viewModel.tags, onRemove: viewModel.removeTag(_:))
 
             Button("Back") {
                 viewModel.goBack()
@@ -131,37 +149,10 @@ struct ShareComposerView: View {
             .buttonStyle(.bordered)
         }
     }
-}
 
-private struct ShareFlowTagList: View {
-    let tags: [String]
-    let onRemove: (String) -> Void
-
-    var body: some View {
-        if tags.isEmpty {
-            Text("No tags yet. You can still save now and edit tags inside the app later.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-        } else {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(tags, id: \.self) { tag in
-                        Button {
-                            onRemove(tag)
-                        } label: {
-                            HStack(spacing: 6) {
-                                Text(tag)
-                                Image(systemName: "xmark.circle.fill")
-                            }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(Color.orange.opacity(0.16))
-                            .clipShape(Capsule())
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-        }
+    @ViewBuilder
+    private func categoryBackground(category: String, isSelected: Bool) -> some View {
+        Capsule()
+            .fill(RecipeCategory.fillColor(for: category, isSelected: isSelected))
     }
 }

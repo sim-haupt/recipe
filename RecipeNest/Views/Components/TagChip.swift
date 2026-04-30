@@ -19,7 +19,7 @@ struct TagChip: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 9)
             .background(isSelected ? RecipeTheme.accent : RecipeTheme.accentSoft)
-            .foregroundStyle(isSelected ? Color.white : RecipeTheme.textPrimary)
+            .foregroundStyle(isSelected ? RecipeTheme.textOnAccent : RecipeTheme.textPrimary)
             .clipShape(Capsule())
             .overlay {
                 Capsule()

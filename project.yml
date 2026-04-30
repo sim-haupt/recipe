@@ -19,10 +19,10 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.example.recipenest
         PRODUCT_NAME: RecipeNest
         SWIFT_VERSION: 5.10
-        INFOPLIST_KEY_CFBundleDisplayName: RecipeNest
+        INFOPLIST_KEY_CFBundleName: "WeCookin'"
+        INFOPLIST_KEY_CFBundleDisplayName: "WeCookin'"
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: true
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: true
-        INFOPLIST_KEY_UILaunchScreen_Generation: true
         INFOPLIST_KEY_UIRequiresFullScreen: false
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.food-and-drink
         INFOPLIST_KEY_CFBundleURLTypes:
@@ -46,6 +46,8 @@ targets:
       path: Config/RecipeNest-Info.plist
       properties:
         UIApplicationSupportsMultipleScenes: false
+        UILaunchScreen:
+          UIImageName: ""
   RecipeNestShareExtension:
     type: app-extension
     platform: iOS
@@ -57,6 +59,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.example.recipenest.share
         PRODUCT_NAME: RecipeNestShareExtension
         SWIFT_VERSION: 5.10
+        INFOPLIST_KEY_CFBundleName: "WeCookin'"
         IPHONEOS_DEPLOYMENT_TARGET: 17.0
         CODE_SIGN_ENTITLEMENTS: Config/RecipeNestShareExtension.entitlements
         SKIP_INSTALL: true
@@ -64,7 +67,7 @@ targets:
     info:
       path: Config/RecipeNestShareExtension-Info.plist
       properties:
-        CFBundleDisplayName: Save to RecipeNest
+        CFBundleDisplayName: "Save to WeCookin'"
         NSExtension:
           NSExtensionAttributes:
             NSExtensionActivationRule:

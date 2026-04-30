@@ -3,9 +3,18 @@ import SwiftUI
 struct HomeView: View {
     @Environment(\.appEnvironment) private var environment
     @Environment(\.scenePhase) private var scenePhase
-    @EnvironmentObject private var sessionViewModel: SessionViewModel
     @FocusState private var isSearchFocused: Bool
     @StateObject private var viewModel: HomeViewModel
+
+    @State private var selectedTab: RecipeHomeTab = .all
+    @State private var feedStyle: RecipeFeedStyle = .cards
+    @State private var allSearchText = ""
+    @State private var favoriteSearchText = ""
+    @State private var allSelectedCategories = Set<String>()
+    @State private var favoriteSelectedCategories = Set<String>()
+    @State private var allMinimumRating = 0
+    @State private var favoriteMinimumRating = 0
+    @State private var isShowingFilterSheet = false
 
     let userProfile: UserProfile
 
@@ -14,19 +23,79 @@ struct HomeView: View {
         _viewModel = StateObject(wrappedValue: HomeViewModel(environment: environment, userProfile: userProfile))
     }
 
-    private var popularRecipes: [Recipe] {
-        viewModel.favoriteRecipes
+    private var baseRecipes: [Recipe] {
+        selectedTab == .all ? viewModel.allRecipesSorted : viewModel.favoriteRecipes
     }
 
-    private var recentRecipes: [Recipe] {
-        viewModel.filteredRecipes.sorted { $0.savedDate > $1.savedDate }
+    private var displayedRecipes: [Recipe] {
+        let searched = viewModel.searchResults(in: baseRecipes, query: currentSearchText)
+        return searched.filter { recipe in
+            let matchesCategory = currentSelectedCategories.isEmpty || !Set(recipe.categories).isDisjoint(with: currentSelectedCategories)
+            let rating = recipe.averageRating ?? 0
+            let matchesRating = currentMinimumRating == 0 || rating >= Double(currentMinimumRating)
+            return matchesCategory && matchesRating
+        }
+    }
+
+    private var currentSearchText: String {
+        selectedTab == .all ? allSearchText : favoriteSearchText
+    }
+
+    private var currentSelectedCategories: Set<String> {
+        selectedTab == .all ? allSelectedCategories : favoriteSelectedCategories
+    }
+
+    private var currentMinimumRating: Int {
+        selectedTab == .all ? allMinimumRating : favoriteMinimumRating
+    }
+
+    private var currentFilterCount: Int {
+        currentSelectedCategories.count + (currentMinimumRating > 0 ? 1 : 0)
+    }
+
+    private var currentSearchBinding: Binding<String> {
+        Binding(
+            get: { selectedTab == .all ? allSearchText : favoriteSearchText },
+            set: { newValue in
+                if selectedTab == .all {
+                    allSearchText = newValue
+                } else {
+                    favoriteSearchText = newValue
+                }
+            }
+        )
+    }
+
+    private var currentSelectedCategoriesBinding: Binding<Set<String>> {
+        Binding(
+            get: { selectedTab == .all ? allSelectedCategories : favoriteSelectedCategories },
+            set: { newValue in
+                if selectedTab == .all {
+                    allSelectedCategories = newValue
+                } else {
+                    favoriteSelectedCategories = newValue
+                }
+            }
+        )
+    }
+
+    private var currentMinimumRatingBinding: Binding<Int> {
+        Binding(
+            get: { selectedTab == .all ? allMinimumRating : favoriteMinimumRating },
+            set: { newValue in
+                if selectedTab == .all {
+                    allMinimumRating = newValue
+                } else {
+                    favoriteMinimumRating = newValue
+                }
+            }
+        )
     }
 
     var body: some View {
         NavigationStack {
             GeometryReader { proxy in
                 let metrics = HomeLayoutMetrics(availableWidth: proxy.size.width)
-                let topInset = proxy.safeAreaInsets.top
                 let bottomInset = proxy.safeAreaInsets.bottom
 
                 ZStack {
@@ -39,31 +108,33 @@ struct HomeView: View {
                         VStack(spacing: 0) {
                             HomeHeroSection(
                                 metrics: metrics,
-                                topInset: topInset,
                                 initials: userInitials,
                                 greeting: "Hello, \(firstName)",
-                                subtitle: "Save beautiful recipes from anywhere.",
-                                searchText: $viewModel.searchText,
+                                subtitle: "What we cookin’?",
+                                searchText: currentSearchBinding,
                                 isSearchFocused: $isSearchFocused,
-                                activeFilterCount: viewModel.selectedTags.count,
-                                savedCount: recentRecipes.count,
-                                favoriteCount: popularRecipes.count,
+                                activeFilterCount: currentFilterCount,
                                 addAction: {
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.84)) {
-                                        viewModel.isShowingAddRecipe = true
-                                    }
+                                    viewModel.isShowingAddRecipe = true
                                 },
                                 filterAction: {
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.84)) {
-                                        viewModel.selectedTags.removeAll()
-                                    }
+                                    isShowingFilterSheet = true
                                 }
                             )
 
                             VStack(alignment: .leading, spacing: metrics.sectionSpacing) {
                                 categoriesSection(metrics: metrics)
-                                favoritesSection(metrics: metrics)
-                                librarySection(metrics: metrics)
+
+                                RecipeTabSelector(
+                                    selectedTab: $selectedTab
+                                )
+
+                                RecipeFeedHeader(
+                                    subtitle: "\(displayedRecipes.count) recipes",
+                                    feedStyle: $feedStyle
+                                )
+
+                                recipeFeed(metrics: metrics)
                             }
                             .frame(maxWidth: .infinity, alignment: .topLeading)
                             .padding(.horizontal, metrics.horizontalPadding)
@@ -71,19 +142,19 @@ struct HomeView: View {
                             .padding(.bottom, metrics.panelBottomPadding + bottomInset)
                             .background {
                                 UnevenRoundedRectangle(
-                                    topLeadingRadius: metrics.panelRadius,
+                                    topLeadingRadius: 0,
                                     bottomLeadingRadius: 0,
                                     bottomTrailingRadius: 0,
-                                    topTrailingRadius: metrics.panelRadius,
+                                    topTrailingRadius: 0,
                                     style: .continuous
                                 )
                                 .fill(RecipeTheme.contentBackground.opacity(0.97))
                                 .overlay {
                                     UnevenRoundedRectangle(
-                                        topLeadingRadius: metrics.panelRadius,
+                                        topLeadingRadius: 0,
                                         bottomLeadingRadius: 0,
                                         bottomTrailingRadius: 0,
-                                        topTrailingRadius: metrics.panelRadius,
+                                        topTrailingRadius: 0,
                                         style: .continuous
                                     )
                                     .stroke(Color.white.opacity(0.72), lineWidth: 1)
@@ -95,29 +166,24 @@ struct HomeView: View {
                         .frame(minHeight: proxy.size.height, alignment: .top)
                     }
                     .scrollDismissesKeyboard(.interactively)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .onTapGesture {
+                        isSearchFocused = false
+                    }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                .safeAreaInset(edge: .bottom, spacing: 0) {
-                    HomeBottomDock(
-                        metrics: metrics,
-                        bottomInset: bottomInset,
-                        addAction: {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.84)) {
-                                viewModel.isShowingAddRecipe = true
-                            }
-                        },
-                        signOutAction: {
-                            sessionViewModel.signOut()
-                        }
-                    )
-                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(RecipeTheme.homeBackdrop.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $viewModel.isShowingAddRecipe) {
                 AddRecipeView(userProfile: userProfile, environment: environment)
+            }
+            .sheet(isPresented: $isShowingFilterSheet) {
+                RecipeFilterSheet(
+                    selectedCategories: currentSelectedCategoriesBinding,
+                    minimumRating: currentMinimumRatingBinding,
+                    availableCategories: RecipeCategory.allTitles
+                )
             }
             .task {
                 viewModel.start()
@@ -165,27 +231,22 @@ struct HomeView: View {
         .allowsHitTesting(false)
     }
 
+    @ViewBuilder
     private func categoriesSection(metrics: HomeLayoutMetrics) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HomeSectionHeader(
-                title: "Categories",
-                actionTitle: selectedTagSummary,
-                metrics: metrics
-            )
+        if !topCategories.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Categories")
+                    .font(.system(size: metrics.sectionCaptionSize + 6, weight: .bold, design: .rounded))
+                    .foregroundStyle(RecipeTheme.textPrimary)
 
-            if viewModel.tags.isEmpty {
-                HomeEmptyCard(message: "Tags you add to recipes will appear here.")
-            } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 10) {
-                        ForEach(viewModel.tags) { tag in
+                        ForEach(topCategories, id: \.self) { category in
                             CategoryBadge(
-                                title: tag.name,
-                                isSelected: viewModel.selectedTags.contains(tag.name),
+                                title: category,
+                                isSelected: currentSelectedCategories.contains(category),
                                 action: {
-                                    withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
-                                        viewModel.toggle(tag: tag)
-                                    }
+                                    toggleCurrentCategory(category)
                                 }
                             )
                         }
@@ -196,72 +257,39 @@ struct HomeView: View {
         }
     }
 
-    private func favoritesSection(metrics: HomeLayoutMetrics) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HomeSectionHeader(
-                title: "Popular Recipes",
-                actionTitle: popularRecipes.isEmpty ? "No favorites yet" : "\(popularRecipes.count) saved",
-                metrics: metrics
-            )
-
-            if popularRecipes.isEmpty {
-                HomeEmptyCard(message: "Favorite a recipe and it will appear here.")
-            } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 16) {
-                        ForEach(popularRecipes.prefix(8)) { recipe in
-                            NavigationLink {
-                                RecipeDetailView(recipe: recipe, userProfile: userProfile, environment: environment)
-                            } label: {
-                                RecipeCardView(
-                                    recipe: recipe,
-                                    imageHeight: metrics.featuredImageHeight,
-                                    titleFontSize: metrics.featuredCardTitleSize,
-                                    favoriteAction: {
-                                        Task { await viewModel.toggleFavorite(recipe) }
-                                    }
-                                )
-                                .frame(width: metrics.featuredCardWidth)
+    @ViewBuilder
+    private func recipeFeed(metrics: HomeLayoutMetrics) -> some View {
+        if displayedRecipes.isEmpty {
+            HomeEmptyCard(message: emptyStateMessage)
+        } else {
+            LazyVStack(spacing: feedStyle == .cards ? 18 : 14) {
+                ForEach(displayedRecipes) { recipe in
+                    NavigationLink {
+                        RecipeDetailView(recipe: recipe, userProfile: userProfile, environment: environment)
+                    } label: {
+                        RecipeCardView(
+                            recipe: recipe,
+                            layoutStyle: feedStyle == .cards ? .featured : .list,
+                            cardWidth: feedStyle == .cards ? metrics.feedCardWidth : metrics.listCardWidth,
+                            imageWidth: feedStyle == .cards ? metrics.feedCardWidth : metrics.listImageWidth,
+                            imageHeight: feedStyle == .cards ? metrics.feedImageHeight : metrics.listImageHeight,
+                            titleFontSize: feedStyle == .cards ? metrics.featuredCardTitleSize : metrics.listCardTitleSize,
+                            favoriteAction: {
+                                Task { await viewModel.toggleFavorite(recipe) }
                             }
-                            .buttonStyle(.plain)
-                        }
+                        )
                     }
-                    .padding(.horizontal, 1)
+                    .buttonStyle(.plain)
                 }
             }
         }
     }
 
-    private func librarySection(metrics: HomeLayoutMetrics) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HomeSectionHeader(
-                title: "Recipe Library",
-                actionTitle: "\(recentRecipes.count) total",
-                metrics: metrics
-            )
-
-            if recentRecipes.isEmpty {
-                HomeEmptyCard(message: "Use the add button to start your household cookbook.")
-            } else {
-                LazyVStack(spacing: 16) {
-                    ForEach(recentRecipes) { recipe in
-                        NavigationLink {
-                            RecipeDetailView(recipe: recipe, userProfile: userProfile, environment: environment)
-                        } label: {
-                            RecipeCardView(
-                                recipe: recipe,
-                                imageHeight: metrics.listImageHeight,
-                                titleFontSize: metrics.listCardTitleSize,
-                                favoriteAction: {
-                                    Task { await viewModel.toggleFavorite(recipe) }
-                                }
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
+    private var emptyStateMessage: String {
+        if selectedTab == .favorites {
+            return "Favorite a recipe and it will appear here."
         }
+        return "No recipes matched the current search and filters."
     }
 
     private var firstName: String {
@@ -275,51 +303,105 @@ struct HomeView: View {
         let pieces = userProfile.displayName.split(separator: " ")
         let firstTwo = pieces.prefix(2).compactMap { $0.first }
         let initials = String(firstTwo)
-        return initials.isEmpty ? "RN" : initials
+        return initials.isEmpty ? "CB" : initials
     }
 
-    private var selectedTagSummary: String {
-        if viewModel.selectedTags.isEmpty {
-            return "All"
+    private var topCategories: [String] {
+        let counts = Dictionary(grouping: viewModel.allRecipesSorted.flatMap(\.categories), by: { $0 })
+            .mapValues(\.count)
+
+        return counts
+            .sorted { lhs, rhs in
+                if lhs.value == rhs.value {
+                    return lhs.key < rhs.key
+                }
+                return lhs.value > rhs.value
+            }
+            .prefix(4)
+            .map(\.key)
+    }
+
+    private func toggleCurrentCategory(_ category: String) {
+        if selectedTab == .all {
+            if allSelectedCategories.contains(category) {
+                allSelectedCategories.remove(category)
+            } else {
+                allSelectedCategories.insert(category)
+            }
+        } else {
+            if favoriteSelectedCategories.contains(category) {
+                favoriteSelectedCategories.remove(category)
+            } else {
+                favoriteSelectedCategories.insert(category)
+            }
         }
-
-        return viewModel.selectedTags.sorted().joined(separator: ", ")
     }
+}
+
+private enum RecipeHomeTab {
+    case all
+    case favorites
+
+    var title: String {
+        switch self {
+        case .all: return "All Recipes"
+        case .favorites: return "Favourites"
+        }
+    }
+}
+
+private enum RecipeFeedStyle {
+    case cards
+    case list
 }
 
 private struct HomeHeroSection: View {
     let metrics: HomeLayoutMetrics
-    let topInset: CGFloat
     let initials: String
     let greeting: String
     let subtitle: String
     @Binding var searchText: String
     @FocusState.Binding var isSearchFocused: Bool
     let activeFilterCount: Int
-    let savedCount: Int
-    let favoriteCount: Int
     let addAction: () -> Void
     let filterAction: () -> Void
 
     var body: some View {
         ZStack(alignment: .topLeading) {
             Rectangle()
-                .fill(RecipeTheme.heroGradient)
+                .fill(Color.clear)
+                .background {
+                    ZStack {
+                        Image("RecipeDetailPattern")
+                            .resizable()
+                            .scaledToFill()
+
+                        LinearGradient(
+                            colors: [
+                                RecipeTheme.accent.opacity(0.10),
+                                RecipeTheme.accentStrong.opacity(0.22)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    }
+                    .clipped()
+                }
                 .overlay(alignment: .topTrailing) {
                     ZStack {
                         Circle()
                             .stroke(Color.white.opacity(0.10), lineWidth: 1)
                             .frame(width: metrics.heroRingOne, height: metrics.heroRingOne)
-                            .offset(x: metrics.availableWidth * 0.14, y: metrics.heroHeight * 0.10)
+                            .offset(x: metrics.availableWidth * 0.14, y: metrics.heroRingOffsetOneY)
 
                         Circle()
                             .stroke(Color.white.opacity(0.08), lineWidth: 1)
                             .frame(width: metrics.heroRingTwo, height: metrics.heroRingTwo)
-                            .offset(x: metrics.availableWidth * 0.04, y: metrics.heroHeight * 0.18)
+                            .offset(x: metrics.availableWidth * 0.04, y: metrics.heroRingOffsetTwoY)
                     }
                 }
 
-            VStack(alignment: .leading, spacing: metrics.heroContentSpacing) {
+            VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .center, spacing: 14) {
                     HStack(spacing: 12) {
                         ZStack {
@@ -327,18 +409,19 @@ private struct HomeHeroSection: View {
                                 .fill(Color.white.opacity(0.22))
                             Text(initials)
                                 .font(.system(size: metrics.avatarFontSize, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(RecipeTheme.textOnAccent)
                         }
                         .frame(width: metrics.avatarSize, height: metrics.avatarSize)
 
                         VStack(alignment: .leading, spacing: 4) {
                             Text(greeting)
                                 .font(.system(size: metrics.heroTitleSize, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(RecipeTheme.textOnAccent)
                                 .lineLimit(1)
+
                             Text(subtitle)
                                 .font(.system(size: metrics.heroSubtitleSize, weight: .medium, design: .rounded))
-                                .foregroundStyle(Color.white.opacity(0.84))
+                                .foregroundStyle(RecipeTheme.textOnAccent.opacity(0.74))
                                 .lineLimit(1)
                         }
                     }
@@ -357,146 +440,186 @@ private struct HomeHeroSection: View {
                     .buttonStyle(PressableScaleButtonStyle())
                 }
 
-                HStack(spacing: 12) {
-                    HomeSearchBar(
-                        text: $searchText,
-                        isFocused: $isSearchFocused,
-                        height: metrics.searchBarHeight
-                    )
-
-                    FilterButton(
-                        isActive: activeFilterCount > 0,
-                        count: activeFilterCount,
-                        side: metrics.searchBarHeight,
-                        action: filterAction
-                    )
-                }
-
-                HStack(spacing: 10) {
-                    HeroMetricPill(title: "Saved", value: savedCount)
-                    HeroMetricPill(title: "Favorites", value: favoriteCount)
-                }
+                HeroSearchBar(
+                    text: $searchText,
+                    isFocused: $isSearchFocused,
+                    height: metrics.searchBarHeight,
+                    activeFilterCount: activeFilterCount,
+                    filterAction: filterAction
+                )
             }
-            .padding(.top, topInset + metrics.heroTopPadding)
+            .padding(.top, metrics.heroTopPadding)
             .padding(.horizontal, metrics.horizontalPadding)
             .padding(.bottom, metrics.heroBottomPadding)
         }
         .frame(maxWidth: .infinity)
-        .frame(height: metrics.heroHeight + topInset, alignment: .top)
     }
 }
 
-private struct HomeSearchBar: View {
+private struct HeroSearchBar: View {
     @Binding var text: String
     @FocusState.Binding var isFocused: Bool
     let height: CGFloat
+    let activeFilterCount: Int
+    let filterAction: () -> Void
 
     var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(isFocused ? RecipeTheme.accentStrong : Color.black.opacity(0.34))
+        HStack(spacing: 12) {
+            HStack(spacing: 10) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(isFocused ? RecipeTheme.accentStrong : Color.black.opacity(0.34))
 
-            TextField("", text: $text, prompt: Text("Search recipes").foregroundStyle(Color.black.opacity(0.28)))
-                .focused($isFocused)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .submitLabel(.search)
-                .font(.system(size: 16, weight: .medium, design: .rounded))
+                TextField("", text: $text, prompt: Text("Search recipes").foregroundStyle(Color.black.opacity(0.28)))
+                    .focused($isFocused)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .font(.system(size: 16, weight: .medium, design: .rounded))
+
+                if !text.isEmpty {
+                    Button {
+                        text = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(Color.black.opacity(0.28))
+                    }
+                    .buttonStyle(.plain)
+                    .transition(.opacity.combined(with: .scale))
+                }
+            }
+            .padding(.horizontal, 14)
+            .frame(maxWidth: .infinity)
+            .frame(height: height)
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(Color.white.opacity(0.97))
+            )
+
+            Button(action: filterAction) {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(Color.white.opacity(0.97))
+                    .frame(width: height, height: height)
+                    .overlay {
+                        Image(systemName: "slider.horizontal.3")
+                            .font(.system(size: 17, weight: .bold))
+                            .foregroundStyle(activeFilterCount > 0 ? RecipeTheme.accentStrong : Color.black.opacity(0.36))
+                    }
+                    .overlay(alignment: .topTrailing) {
+                        if activeFilterCount > 0 {
+                            Text("\(min(activeFilterCount, 9))")
+                                .font(.system(size: 10, weight: .bold, design: .rounded))
+                                .foregroundStyle(RecipeTheme.textOnAccent)
+                                .frame(minWidth: 18, minHeight: 18)
+                                .background(RecipeTheme.accentStrong)
+                                .clipShape(Capsule())
+                                .offset(x: 8, y: -8)
+                        }
+                    }
+                .shadow(color: Color.black.opacity(0.08), radius: 10, y: 5)
+            }
+            .buttonStyle(PressableScaleButtonStyle())
         }
-        .padding(.horizontal, 16)
-        .frame(maxWidth: .infinity)
-        .frame(height: height)
-        .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color.white.opacity(0.97))
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(isFocused ? Color.white.opacity(0.95) : Color.white.opacity(0.45), lineWidth: isFocused ? 1.5 : 1)
-        }
-        .shadow(color: Color.black.opacity(isFocused ? 0.10 : 0.07), radius: 12, y: 6)
     }
 }
 
-private struct FilterButton: View {
-    let isActive: Bool
-    let count: Int
-    let side: CGFloat
+private struct RecipeTabSelector: View {
+    @Binding var selectedTab: RecipeHomeTab
+
+    var body: some View {
+        HStack(spacing: 12) {
+            RecipeTabButton(
+                title: "All Recipes",
+                isSelected: selectedTab == .all,
+                action: { selectedTab = .all }
+            )
+
+            RecipeTabButton(
+                title: "Favourites",
+                isSelected: selectedTab == .favorites,
+                action: { selectedTab = .favorites }
+            )
+        }
+    }
+}
+
+private struct RecipeTabButton: View {
+    let title: String
+    let isSelected: Bool
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(Color.white.opacity(0.97))
-                    .frame(width: side, height: side)
-
-                Image(systemName: "slider.horizontal.3")
-                    .font(.system(size: 17, weight: .bold))
-                    .foregroundStyle(isActive ? RecipeTheme.accentStrong : Color.black.opacity(0.34))
-
-                if isActive {
-                    VStack {
-                        HStack {
-                            Spacer()
-                            Text("\(min(count, 9))")
-                                .font(.system(size: 10, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white)
-                                .frame(minWidth: 18, minHeight: 18)
-                                .background(RecipeTheme.accentStrong)
-                                .clipShape(Capsule())
-                                .offset(x: 7, y: -7)
-                        }
-                        Spacer()
-                    }
-                    .frame(width: side, height: side)
-                }
+            Text(title)
+                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .foregroundStyle(isSelected ? RecipeTheme.textOnAccent : RecipeTheme.textPrimary)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .fill(isSelected ? AnyShapeStyle(RecipeTheme.heroGradient) : AnyShapeStyle(RecipeTheme.surface))
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .stroke(isSelected ? Color.clear : RecipeTheme.strokeSoft, lineWidth: 1)
             }
-            .shadow(color: Color.black.opacity(0.08), radius: 10, y: 5)
+            .shadow(color: isSelected ? RecipeTheme.mintShadow : RecipeTheme.shadow.opacity(0.05), radius: 12, y: 6)
         }
         .buttonStyle(PressableScaleButtonStyle())
     }
 }
 
-private struct HeroMetricPill: View {
-    let title: String
-    let value: Int
+private struct RecipeFeedHeader: View {
+    let subtitle: String
+    @Binding var feedStyle: RecipeFeedStyle
 
     var body: some View {
-        HStack(spacing: 8) {
-            Text("\(value)")
-                .font(.system(size: 13, weight: .bold, design: .rounded))
-            Text(title)
-                .font(.system(size: 12, weight: .medium, design: .rounded))
-        }
-        .foregroundStyle(.white)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(Color.white.opacity(0.14))
-        .clipShape(Capsule())
-    }
-}
-
-private struct HomeSectionHeader: View {
-    let title: String
-    let actionTitle: String
-    let metrics: HomeLayoutMetrics
-
-    var body: some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text(title)
-                .font(.system(size: metrics.sectionTitleSize, weight: .bold, design: .rounded))
-                .foregroundStyle(RecipeTheme.textPrimary)
+        HStack(alignment: .center, spacing: 16) {
+            Text(subtitle)
+                .font(.system(size: 13, weight: .medium, design: .rounded))
+                .foregroundStyle(RecipeTheme.textSecondary)
 
             Spacer(minLength: 12)
 
-            Text(actionTitle)
-                .font(.system(size: metrics.sectionCaptionSize, weight: .semibold, design: .rounded))
-                .foregroundStyle(RecipeTheme.accentStrong)
-                .lineLimit(1)
-                .minimumScaleFactor(0.82)
+            RecipeViewSwitcher(feedStyle: $feedStyle)
         }
+    }
+}
+
+private struct RecipeViewSwitcher: View {
+    @Binding var feedStyle: RecipeFeedStyle
+
+    var body: some View {
+        HStack(spacing: 8) {
+            switcherButton(systemName: "rectangle.grid.1x2.fill", style: .cards)
+            switcherButton(systemName: "list.bullet.rectangle.portrait.fill", style: .list)
+        }
+        .padding(6)
+        .background(
+            Capsule()
+                .fill(Color.white.opacity(0.86))
+        )
+        .overlay {
+            Capsule()
+                .stroke(RecipeTheme.strokeSoft, lineWidth: 1)
+        }
+    }
+
+    private func switcherButton(systemName: String, style: RecipeFeedStyle) -> some View {
+        Button {
+            feedStyle = style
+        } label: {
+            Image(systemName: systemName)
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(feedStyle == style ? RecipeTheme.textOnAccent : RecipeTheme.accentStrong)
+                .frame(width: 38, height: 38)
+                .background(
+                    Circle()
+                        .fill(feedStyle == style ? RecipeTheme.accentStrong : Color.clear)
+                )
+        }
+        .buttonStyle(PressableScaleButtonStyle())
     }
 }
 
@@ -507,27 +630,19 @@ private struct CategoryBadge: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 8) {
-                Circle()
-                    .fill(isSelected ? Color.white : RecipeTheme.accent.opacity(0.24))
-                    .frame(width: 7, height: 7)
-
-                Text(title)
-                    .font(.system(size: 14, weight: .semibold, design: .rounded))
-                    .foregroundStyle(isSelected ? .white : RecipeTheme.accentStrong)
-                    .lineLimit(1)
-            }
-            .padding(.horizontal, 15)
-            .frame(height: 42)
-            .background(
-                Capsule()
-                    .fill(isSelected ? RecipeTheme.accentStrong : RecipeTheme.surface)
-            )
-            .overlay {
-                Capsule()
-                    .stroke(isSelected ? Color.clear : RecipeTheme.strokeSoft, lineWidth: 1)
-            }
-            .shadow(color: isSelected ? RecipeTheme.mintShadow : RecipeTheme.shadow.opacity(0.45), radius: 10, y: 5)
+            Text(title)
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .foregroundStyle(RecipeCategory.color(for: title))
+                .padding(.horizontal, 14)
+                .padding(.vertical, 9)
+                .background(
+                    Capsule()
+                        .fill(RecipeCategory.fillColor(for: title, isSelected: isSelected))
+                )
+                .overlay {
+                    Capsule()
+                        .stroke(RecipeCategory.strokeColor(for: title, isSelected: isSelected), lineWidth: 1)
+                }
         }
         .buttonStyle(PressableScaleButtonStyle())
     }
@@ -539,13 +654,17 @@ struct RecipeTagPill: View {
     var body: some View {
         Text(title)
             .font(.system(size: 11, weight: .semibold, design: .rounded))
-            .foregroundStyle(RecipeTheme.accentStrong)
+            .foregroundStyle(RecipeCategory.color(for: title))
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .background(
                 Capsule()
-                    .fill(RecipeTheme.accentSoft)
+                    .fill(RecipeCategory.fillColor(for: title, isSelected: true))
             )
+            .overlay {
+                Capsule()
+                    .stroke(RecipeCategory.strokeColor(for: title, isSelected: true), lineWidth: 1)
+            }
     }
 }
 
@@ -562,12 +681,6 @@ struct RecipeRatingPill: View {
             Text(String(format: "%.1f", rating))
                 .font(.system(size: 12, weight: .bold, design: .rounded))
                 .foregroundStyle(RecipeTheme.textPrimary)
-
-            if reviewCount > 0 {
-                Text("(\(reviewCount))")
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(RecipeTheme.textSecondary)
-            }
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 7)
@@ -598,68 +711,116 @@ private struct HomeEmptyCard: View {
     }
 }
 
-private struct HomeBottomDock: View {
-    let metrics: HomeLayoutMetrics
-    let bottomInset: CGFloat
-    let addAction: () -> Void
-    let signOutAction: () -> Void
+private struct RecipeFilterSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Binding var selectedCategories: Set<String>
+    @Binding var minimumRating: Int
+
+    let availableCategories: [String]
 
     var body: some View {
-        HStack(spacing: 0) {
-            HomeBottomDockItem(systemName: "house.fill", title: "Home", isActive: true, action: {})
+        NavigationStack {
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 24) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Categories")
+                            .font(.system(size: 17, weight: .bold, design: .rounded))
 
-            Button(action: addAction) {
-                ZStack {
-                    Circle()
-                        .fill(RecipeTheme.heroGradient)
-                        .frame(width: metrics.dockCenterButtonSize, height: metrics.dockCenterButtonSize)
-                        .shadow(color: RecipeTheme.heroGlow, radius: 18, y: 8)
+                        if availableCategories.isEmpty {
+                            HomeEmptyCard(message: "Categories will appear here once recipes are assigned.")
+                        } else {
+                            AdaptiveCategoryGrid(tags: availableCategories, selectedTags: $selectedCategories)
+                        }
+                    }
 
-                    Image(systemName: "plus")
-                        .font(.system(size: metrics.dockCenterIconSize, weight: .bold))
-                        .foregroundStyle(.white)
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Minimum Rating")
+                            .font(.system(size: 17, weight: .bold, design: .rounded))
+
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 88), spacing: 10)], alignment: .leading, spacing: 10) {
+                            ratingChip(value: 0, label: "Any")
+                            ratingChip(value: 3, label: "3+")
+                            ratingChip(value: 4, label: "4+")
+                            ratingChip(value: 5, label: "5")
+                        }
+                    }
                 }
-                .frame(maxWidth: .infinity)
+                .padding(20)
             }
-            .buttonStyle(PressableScaleButtonStyle())
-
-            HomeBottomDockItem(systemName: "rectangle.portrait.and.arrow.right", title: "Sign Out", isActive: false, action: signOutAction)
-        }
-        .padding(.horizontal, metrics.dockHorizontalPadding)
-        .padding(.top, 8)
-        .padding(.bottom, max(8, bottomInset - 6))
-        .frame(maxWidth: .infinity)
-        .background {
-            Rectangle()
-                .fill(.ultraThinMaterial)
-                .overlay(alignment: .top) {
-                    Rectangle()
-                        .fill(Color.white.opacity(0.55))
-                        .frame(height: 1)
+            .background(RecipeTheme.homeBackdrop.ignoresSafeArea())
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Reset") {
+                        selectedCategories.removeAll()
+                        minimumRating = 0
+                    }
+                    .foregroundStyle(RecipeTheme.accentStrong)
                 }
-                .ignoresSafeArea(edges: .bottom)
+
+                ToolbarItem(placement: .principal) {
+                    Text("Filters")
+                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                }
+
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                    .foregroundStyle(RecipeTheme.accentStrong)
+                }
+            }
         }
+        .presentationDetents([.medium, .large])
+    }
+
+    private func ratingChip(value: Int, label: String) -> some View {
+        Button {
+            minimumRating = value
+        } label: {
+            HStack(spacing: 6) {
+                if value > 0 {
+                    Image(systemName: "star.fill")
+                        .font(.system(size: 11, weight: .bold))
+                }
+                Text(label)
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+            }
+            .foregroundStyle(minimumRating == value ? RecipeTheme.textOnAccent : RecipeTheme.accentStrong)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(
+                Capsule()
+                    .fill(minimumRating == value ? RecipeTheme.accentStrong : RecipeTheme.surface)
+            )
+            .overlay {
+                Capsule()
+                    .stroke(minimumRating == value ? Color.clear : RecipeTheme.strokeSoft, lineWidth: 1)
+            }
+        }
+        .buttonStyle(PressableScaleButtonStyle())
     }
 }
 
-private struct HomeBottomDockItem: View {
-    let systemName: String
-    let title: String
-    let isActive: Bool
-    let action: () -> Void
+private struct AdaptiveCategoryGrid: View {
+    let tags: [String]
+    @Binding var selectedTags: Set<String>
 
     var body: some View {
-        Button(action: action) {
-            VStack(spacing: 6) {
-                Image(systemName: systemName)
-                    .font(.system(size: 18, weight: .semibold))
-                Text(title)
-                    .font(.system(size: 10, weight: .medium, design: .rounded))
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 132), spacing: 10)], alignment: .leading, spacing: 10) {
+            ForEach(tags, id: \.self) { tag in
+                CategoryBadge(
+                    title: tag,
+                    isSelected: selectedTags.contains(tag),
+                    action: {
+                        if selectedTags.contains(tag) {
+                            selectedTags.remove(tag)
+                        } else {
+                            selectedTags.insert(tag)
+                        }
+                    }
+                )
             }
-            .foregroundStyle(isActive ? RecipeTheme.accentStrong : RecipeTheme.textSecondary)
-            .frame(maxWidth: .infinity)
         }
-        .buttonStyle(PressableScaleButtonStyle())
     }
 }
 
@@ -675,37 +836,34 @@ private struct HomeLayoutMetrics {
     let availableWidth: CGFloat
 
     var horizontalPadding: CGFloat { availableWidth < 380 ? 16 : 20 }
-    var sectionSpacing: CGFloat { availableWidth < 380 ? 24 : 28 }
-    var heroHeight: CGFloat { availableWidth < 380 ? 196 : 210 }
-    var heroTopPadding: CGFloat { availableWidth < 380 ? 2 : 4 }
-    var heroBottomPadding: CGFloat { availableWidth < 380 ? 12 : 14 }
-    var heroContentSpacing: CGFloat { availableWidth < 380 ? 12 : 14 }
+    var sectionSpacing: CGFloat { availableWidth < 380 ? 22 : 26 }
+    var heroTopPadding: CGFloat { availableWidth < 380 ? 8 : 10 }
+    var heroBottomPadding: CGFloat { availableWidth < 380 ? 18 : 20 }
     var avatarSize: CGFloat { availableWidth < 380 ? 44 : 48 }
     var avatarFontSize: CGFloat { availableWidth < 380 ? 14 : 15 }
     var heroTitleSize: CGFloat { availableWidth < 380 ? 17 : 18 }
     var heroSubtitleSize: CGFloat { availableWidth < 380 ? 12 : 13 }
     var heroActionSize: CGFloat { availableWidth < 380 ? 48 : 52 }
     var heroActionIconSize: CGFloat { availableWidth < 380 ? 18 : 19 }
-    var searchBarHeight: CGFloat { availableWidth < 380 ? 54 : 58 }
+    var searchBarHeight: CGFloat { availableWidth < 380 ? 44 : 46 }
     var heroRingOne: CGFloat { availableWidth * 0.64 }
     var heroRingTwo: CGFloat { availableWidth * 0.96 }
+    var heroRingOffsetOneY: CGFloat { availableWidth < 380 ? 10 : 14 }
+    var heroRingOffsetTwoY: CGFloat { availableWidth < 380 ? 18 : 24 }
 
     var panelRadius: CGFloat { availableWidth < 380 ? 30 : 34 }
-    var panelTopPadding: CGFloat { availableWidth < 380 ? 22 : 26 }
-    var panelBottomPadding: CGFloat { availableWidth < 380 ? 108 : 116 }
+    var panelTopPadding: CGFloat { availableWidth < 380 ? 20 : 24 }
+    var panelBottomPadding: CGFloat { availableWidth < 380 ? 28 : 32 }
 
-    var featuredCardWidth: CGFloat { min(max((availableWidth - (horizontalPadding * 2)) * 0.84, 286), 380) }
-    var featuredImageHeight: CGFloat { availableWidth < 380 ? 214 : 232 }
+    var feedCardWidth: CGFloat { availableWidth - (horizontalPadding * 2) }
+    var feedImageHeight: CGFloat { availableWidth < 380 ? 208 : 232 }
     var featuredCardTitleSize: CGFloat { availableWidth < 380 ? 17 : 18 }
-    var listImageHeight: CGFloat { availableWidth < 380 ? 196 : 214 }
-    var listCardTitleSize: CGFloat { availableWidth < 380 ? 16 : 17 }
+    var listCardWidth: CGFloat { availableWidth - (horizontalPadding * 2) }
+    var listImageWidth: CGFloat { availableWidth < 380 ? 124 : 132 }
+    var listImageHeight: CGFloat { availableWidth < 380 ? 108 : 116 }
+    var listCardTitleSize: CGFloat { availableWidth < 380 ? 15 : 16 }
 
-    var sectionTitleSize: CGFloat { availableWidth < 380 ? 20 : 22 }
     var sectionCaptionSize: CGFloat { availableWidth < 380 ? 11 : 12 }
-
-    var dockHorizontalPadding: CGFloat { availableWidth < 380 ? 20 : 24 }
-    var dockCenterButtonSize: CGFloat { availableWidth < 380 ? 60 : 64 }
-    var dockCenterIconSize: CGFloat { availableWidth < 380 ? 23 : 24 }
 
     var backdropOrbOne: CGFloat { availableWidth * 0.84 }
     var backdropOrbTwo: CGFloat { availableWidth * 0.68 }
@@ -724,33 +882,13 @@ private enum HomePreviewData {
 }
 
 private struct HomePreviewHost: View {
-    private let sessionViewModel = SessionViewModel(environment: .demo)
-
     var body: some View {
-        GeometryReader { _ in
-            HomeView(userProfile: HomePreviewData.user, environment: .demo)
-                .environmentObject(sessionViewModel)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(RecipeTheme.homeBackdrop.ignoresSafeArea())
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(RecipeTheme.homeBackdrop.ignoresSafeArea())
+        HomeView(userProfile: HomePreviewData.user, environment: .demo)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(RecipeTheme.homeBackdrop.ignoresSafeArea())
     }
 }
 
-#Preview("iPhone 16 Pro") {
+#Preview {
     HomePreviewHost()
-        .previewLayout(.device)
-}
-
-#Preview("iPhone SE") {
-    HomePreviewHost()
-        .previewLayout(.device)
-        .previewDevice("iPhone SE (3rd generation)")
-}
-
-#Preview("iPhone 16 Pro Max") {
-    HomePreviewHost()
-        .previewLayout(.device)
-        .previewDevice("iPhone 16 Pro Max")
 }
