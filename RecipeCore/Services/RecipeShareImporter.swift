@@ -30,18 +30,28 @@ final class RecipeShareImporter {
 
             if let attachments = item.attachments {
                 for provider in attachments {
+                    metadata["types"] = appendMetadataTypes(
+                        existing: metadata["types"],
+                        newTypes: provider.registeredTypeIdentifiers
+                    )
+
                     if sourceURL == nil, let url = await loadURL(from: provider) {
                         sourceURL = url.absoluteString
                     }
 
-                    if title.isEmpty, let text = await loadText(from: provider) {
+                    if let text = await loadText(from: provider) {
                         let cleanedText = ImportedTextSanitizer.cleanMultiline(text)
-                        if description.isEmpty {
+                        if description.isEmpty, !looksLikeURLOnly(cleanedText) {
                             description = cleanedText
-                        } else {
+                        }
+                        if title.isEmpty, !looksLikeURLOnly(cleanedText) {
                             title = inferTitle(from: cleanedText)
                         }
                         rawText = append(rawText, with: cleanedText)
+
+                        if sourceURL == nil, let detectedURL = firstURL(in: cleanedText) {
+                            sourceURL = detectedURL.absoluteString
+                        }
                     }
 
                     if imageData == nil, let data = await loadImageData(from: provider) {
@@ -149,6 +159,14 @@ final class RecipeShareImporter {
         return existing + "\n\n" + cleanedValue
     }
 
+    private func appendMetadataTypes(existing: String?, newTypes: [String]) -> String {
+        let merged = Set((existing?.components(separatedBy: ",") ?? []) + newTypes)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .sorted()
+        return merged.joined(separator: ",")
+    }
+
     private func fetchRemoteMetadata(from url: URL) async -> RemoteMetadata? {
         async let linkMetadataTask = fetchLinkMetadata(from: url)
         async let htmlMetadataTask = fetchHTMLMetadata(from: url)
@@ -214,19 +232,50 @@ final class RecipeShareImporter {
         if provider.hasItemConformingToTypeIdentifier(UTType.url.identifier) {
             return await withCheckedContinuation { continuation in
                 provider.loadItem(forTypeIdentifier: UTType.url.identifier, options: nil) { item, _ in
-                    continuation.resume(returning: item as? URL)
+                    if let url = item as? URL {
+                        continuation.resume(returning: url)
+                    } else if let text = item as? String {
+                        continuation.resume(returning: URL(string: text.trimmingCharacters(in: .whitespacesAndNewlines)))
+                    } else {
+                        continuation.resume(returning: nil)
+                    }
                 }
             }
         }
 
-        if provider.hasItemConformingToTypeIdentifier(UTType.plainText.identifier) {
+        if let text = await loadText(from: provider) {
+            return firstURL(in: text)
+        }
+
+        return nil
+    }
+
+    private func loadText(from provider: NSItemProvider) async -> String? {
+        let candidateTypeIdentifiers: [String] = [
+            UTType.plainText.identifier,
+            UTType.text.identifier,
+            UTType.utf8PlainText.identifier,
+            UTType.html.identifier,
+            "public.text",
+            "public.plain-text",
+            "public.utf8-plain-text"
+        ]
+
+        for typeIdentifier in candidateTypeIdentifiers where provider.hasItemConformingToTypeIdentifier(typeIdentifier) {
+            if let text = await loadStringItem(from: provider, typeIdentifier: typeIdentifier) {
+                let cleaned = typeIdentifier == UTType.html.identifier
+                    ? ImportedTextSanitizer.cleanMultiline(htmlToText(text))
+                    : ImportedTextSanitizer.cleanMultiline(text)
+                if !cleaned.isEmpty {
+                    return cleaned
+                }
+            }
+        }
+
+        if provider.canLoadObject(ofClass: NSAttributedString.self) {
             return await withCheckedContinuation { continuation in
-                provider.loadItem(forTypeIdentifier: UTType.plainText.identifier, options: nil) { item, _ in
-                    guard let text = item as? String else {
-                        continuation.resume(returning: nil)
-                        return
-                    }
-                    continuation.resume(returning: URL(string: text.trimmingCharacters(in: .whitespacesAndNewlines)))
+                provider.loadObject(ofClass: NSAttributedString.self) { object, _ in
+                    continuation.resume(returning: (object as? NSAttributedString)?.string)
                 }
             }
         }
@@ -234,16 +283,50 @@ final class RecipeShareImporter {
         return nil
     }
 
-    private func loadText(from provider: NSItemProvider) async -> String? {
-        guard provider.hasItemConformingToTypeIdentifier(UTType.plainText.identifier) else {
-            return nil
-        }
+    private func loadStringItem(from provider: NSItemProvider, typeIdentifier: String) async -> String? {
+        await withCheckedContinuation { continuation in
+            provider.loadItem(forTypeIdentifier: typeIdentifier, options: nil) { item, _ in
+                if let text = item as? String {
+                    continuation.resume(returning: text)
+                    return
+                }
 
-        return await withCheckedContinuation { continuation in
-            provider.loadItem(forTypeIdentifier: UTType.plainText.identifier, options: nil) { item, _ in
-                continuation.resume(returning: item as? String)
+                if let attributed = item as? NSAttributedString {
+                    continuation.resume(returning: attributed.string)
+                    return
+                }
+
+                if let url = item as? URL {
+                    continuation.resume(returning: url.absoluteString)
+                    return
+                }
+
+                if let data = item as? Data, let decoded = String(data: data, encoding: .utf8) {
+                    continuation.resume(returning: decoded)
+                    return
+                }
+
+                continuation.resume(returning: nil)
             }
         }
+    }
+
+    private func htmlToText(_ html: String) -> String {
+        RecipePageContentExtractor
+            .extract(from: html, baseURL: URL(string: "https://example.com")!)
+            .bodyText ?? ""
+    }
+
+    private func firstURL(in text: String) -> URL? {
+        let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
+        let range = NSRange(text.startIndex..<text.endIndex, in: text)
+        return detector?.firstMatch(in: text, options: [], range: range)?.url
+    }
+
+    private func looksLikeURLOnly(_ text: String) -> Bool {
+        let cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleaned.isEmpty else { return true }
+        return firstURL(in: cleaned)?.absoluteString == cleaned
     }
 
     private func loadImageData(from provider: NSItemProvider) async -> Data? {
