@@ -67,7 +67,7 @@ This repo is a monorepo, so the Railway service should deploy only the backend s
 
 4. In service variables, add:
    - `OPENAI_API_KEY`
-   - `OPENAI_MODEL` = `gpt-4.1-mini`
+   - `OPENAI_MODEL` = `gpt-4.1`
 5. In the service Networking settings, generate a public domain.
 6. In the service Deploy settings, set the config-as-code path to:
 

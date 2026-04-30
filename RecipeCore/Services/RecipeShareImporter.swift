@@ -201,7 +201,7 @@ final class RecipeShareImporter {
 
         let (data, _) = try await URLSession.shared.data(for: request)
         let html = String(data: data, encoding: .utf8) ?? String(decoding: data, as: UTF8.self)
-        return HTMLMetadata(html: html, baseURL: url)
+        return RecipePageContentExtractor.extract(from: html, baseURL: url)
     }
 
     private func firstNonEmpty(_ values: [String?]) -> String? {
@@ -300,88 +300,4 @@ private struct RemoteMetadata {
     var bestDescription: String? { description }
 }
 
-private struct HTMLMetadata {
-    let pageTitle: String?
-    let metaDescription: String?
-    let openGraphTitle: String?
-    let openGraphDescription: String?
-    let twitterTitle: String?
-    let twitterDescription: String?
-    let canonicalURL: URL?
-    let imageURL: URL?
-    let bodyText: String?
-
-    init(html: String, baseURL: URL) {
-        pageTitle = HTMLMetadata.capture(in: html, pattern: "<title[^>]*>(.*?)</title>")
-        metaDescription = HTMLMetadata.metaContent(in: html, key: "description")
-        openGraphTitle = HTMLMetadata.metaContent(in: html, property: "og:title")
-        openGraphDescription = HTMLMetadata.metaContent(in: html, property: "og:description")
-        twitterTitle = HTMLMetadata.metaContent(in: html, key: "twitter:title")
-        twitterDescription = HTMLMetadata.metaContent(in: html, key: "twitter:description")
-
-        let canonicalValue = HTMLMetadata.capture(in: html, pattern: "<link[^>]*rel=[\"']canonical[\"'][^>]*href=[\"'](.*?)[\"'][^>]*>")
-        canonicalURL = canonicalValue.flatMap { URL(string: $0, relativeTo: baseURL)?.absoluteURL }
-
-        let imageValue = HTMLMetadata.metaContent(in: html, property: "og:image")
-            ?? HTMLMetadata.metaContent(in: html, key: "twitter:image")
-        imageURL = imageValue.flatMap { URL(string: $0, relativeTo: baseURL)?.absoluteURL }
-        bodyText = HTMLMetadata.extractBodyText(from: html)
-    }
-
-    private static func metaContent(in html: String, key: String? = nil, property: String? = nil) -> String? {
-        if let property {
-            return capture(in: html, pattern: "<meta[^>]*property=[\"']\(NSRegularExpression.escapedPattern(for: property))[\"'][^>]*content=[\"'](.*?)[\"'][^>]*>")
-        }
-
-        if let key {
-            return capture(in: html, pattern: "<meta[^>]*name=[\"']\(NSRegularExpression.escapedPattern(for: key))[\"'][^>]*content=[\"'](.*?)[\"'][^>]*>")
-        }
-
-        return nil
-    }
-
-    private static func capture(in html: String, pattern: String) -> String? {
-        guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive, .dotMatchesLineSeparators]) else {
-            return nil
-        }
-
-        let range = NSRange(html.startIndex..<html.endIndex, in: html)
-        guard let match = regex.firstMatch(in: html, options: [], range: range),
-              let captureRange = Range(match.range(at: 1), in: html) else {
-            return nil
-        }
-
-        return decodeHTMLEntities(String(html[captureRange]))
-    }
-
-    private static func decodeHTMLEntities(_ string: String) -> String {
-        string
-            .replacingOccurrences(of: "&amp;", with: "&")
-            .replacingOccurrences(of: "&quot;", with: "\"")
-            .replacingOccurrences(of: "&#39;", with: "'")
-            .replacingOccurrences(of: "&apos;", with: "'")
-            .replacingOccurrences(of: "&lt;", with: "<")
-            .replacingOccurrences(of: "&gt;", with: ">")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private static func extractBodyText(from html: String) -> String {
-        let withoutScripts = html
-            .replacingOccurrences(of: "<script[\\s\\S]*?</script>", with: " ", options: .regularExpression)
-            .replacingOccurrences(of: "<style[\\s\\S]*?</style>", with: " ", options: .regularExpression)
-
-        let withLineBreaks = withoutScripts
-            .replacingOccurrences(of: "(?i)</(p|div|section|article|li|h1|h2|h3|h4|h5|h6|br)>", with: "\n", options: .regularExpression)
-            .replacingOccurrences(of: "<[^>]+>", with: " ", options: .regularExpression)
-
-        let decoded = decodeHTMLEntities(withLineBreaks)
-        let normalizedLines = decoded
-            .components(separatedBy: .newlines)
-            .map { $0.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression).trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-
-        return normalizedLines
-            .prefix(140)
-            .joined(separator: "\n")
-    }
-}
+private typealias HTMLMetadata = RecipePageContent

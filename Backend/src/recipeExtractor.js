@@ -2,12 +2,15 @@ import OpenAI from "openai";
 
 import { recipeExtractionSchema } from "./schema.js";
 
-const DEFAULT_MODEL = process.env.OPENAI_MODEL || "gpt-4.1-mini";
+const DEFAULT_MODEL = process.env.OPENAI_MODEL || "gpt-4.1";
 const MAX_TEXT_LENGTH = 24000;
 
 const SYSTEM_PROMPT = [
   "You extract structured recipe data from scraped webpage text or social post text.",
   "Use only the provided input.",
+  "The scraped text may include navigation, related content, social captions, cookie text, or other page chrome.",
+  "Prioritize recipe-specific content such as structured ingredients, instructions, and notes.",
+  "Ignore unrelated page text, author bios, comment prompts, navigation labels, and legal/footer text.",
   "Do not invent ingredients, quantities, or steps that are not supported by the source.",
   "If the source is incomplete, return empty arrays or an empty summary rather than guessing.",
   "The summary must be exactly one concise sentence.",
