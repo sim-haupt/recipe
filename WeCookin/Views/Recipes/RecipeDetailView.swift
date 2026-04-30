@@ -222,6 +222,38 @@ struct RecipeDetailView: View {
                 .font(.system(size: metrics.bodyTextSize, weight: .medium, design: .rounded))
                 .foregroundStyle(RecipeTheme.textPrimary)
 
+            if !viewModel.recipe.ingredients.isEmpty || !viewModel.recipe.preparationSteps.isEmpty || !viewModel.recipe.aiNotes.isEmpty {
+                Divider()
+                    .padding(.vertical, 2)
+            }
+
+            if !viewModel.recipe.ingredients.isEmpty {
+                recipeContentSection(
+                    title: "Ingredients",
+                    items: viewModel.recipe.ingredients,
+                    metrics: metrics,
+                    usesNumbers: false
+                )
+            }
+
+            if !viewModel.recipe.preparationSteps.isEmpty {
+                recipeContentSection(
+                    title: "Preparation",
+                    items: viewModel.recipe.preparationSteps,
+                    metrics: metrics,
+                    usesNumbers: true
+                )
+            }
+
+            if !viewModel.recipe.aiNotes.isEmpty {
+                recipeContentSection(
+                    title: "Notes",
+                    items: viewModel.recipe.aiNotes,
+                    metrics: metrics,
+                    usesNumbers: false
+                )
+            }
+
             if !viewModel.recipe.tagNames.isEmpty {
                 Text(viewModel.recipe.tagNames.map { "#\($0.replacingOccurrences(of: " ", with: ""))" }.joined(separator: " "))
                     .font(.system(size: metrics.bodyTextSize - 1, weight: .semibold, design: .rounded))
@@ -238,6 +270,28 @@ struct RecipeDetailView: View {
         .padding(metrics.cardPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(RecipeTheme.surface)
+    }
+
+    private func recipeContentSection(title: String, items: [String], metrics: RecipeDetailLayoutMetrics, usesNumbers: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.system(size: metrics.bodyTextSize + 1, weight: .bold, design: .rounded))
+                .foregroundStyle(RecipeTheme.textPrimary)
+
+            ForEach(Array(items.enumerated()), id: \.offset) { index, item in
+                HStack(alignment: .top, spacing: 10) {
+                    Text(usesNumbers ? "\(index + 1)." : "•")
+                        .font(.system(size: metrics.bodyTextSize, weight: .bold, design: .rounded))
+                        .foregroundStyle(RecipeTheme.accentStrong)
+                        .frame(width: usesNumbers ? 22 : 10, alignment: .leading)
+
+                    Text(item)
+                        .font(.system(size: metrics.bodyTextSize, weight: .medium, design: .rounded))
+                        .foregroundStyle(RecipeTheme.textPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
     }
 
     private var categoryOverlayRow: some View {
@@ -332,10 +386,21 @@ struct RecipeDetailView: View {
     }
 
     private var shareItems: [Any] {
-        var items: [Any] = [
-            viewModel.recipe.title,
-            viewModel.recipe.description
-        ]
+        var details: [String] = [viewModel.recipe.title]
+
+        if !viewModel.recipe.description.isEmpty {
+            details.append(viewModel.recipe.description)
+        }
+
+        if !viewModel.recipe.ingredients.isEmpty {
+            details.append("Ingredients:\n" + viewModel.recipe.ingredients.map { "• \($0)" }.joined(separator: "\n"))
+        }
+
+        if !viewModel.recipe.preparationSteps.isEmpty {
+            details.append("Preparation:\n" + viewModel.recipe.preparationSteps.enumerated().map { "\($0.offset + 1). \($0.element)" }.joined(separator: "\n"))
+        }
+
+        var items: [Any] = [details.joined(separator: "\n\n")]
 
         if let sourceURL = viewModel.recipe.sourceURL, let url = URL(string: sourceURL) {
             items.append(url)
@@ -346,6 +411,7 @@ struct RecipeDetailView: View {
 
     private var editSheet: some View {
         let sheetMetrics = RecipeDetailLayoutMetrics(availableWidth: UIScreen.main.bounds.width)
+        let recipeImageURL = viewModel.recipe.imageURL
 
         return NavigationStack {
             ScrollView {
@@ -357,7 +423,7 @@ struct RecipeDetailView: View {
                                     .resizable()
                                     .scaledToFill()
                             } else {
-                                RemoteRecipeImage(imageURL: viewModel.recipe.imageURL, width: sheetMetrics.commentImageWidth, height: 180)
+                                RemoteRecipeImage(imageURL: recipeImageURL, width: sheetMetrics.commentImageWidth, height: 180)
                             }
                         }
                         .frame(width: sheetMetrics.commentImageWidth, height: 180)

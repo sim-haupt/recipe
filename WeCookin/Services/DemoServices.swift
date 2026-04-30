@@ -189,13 +189,15 @@ final class DemoRecipeService: RecipeServicing {
         let tags = ensureTags(tagNames: input.tagNames, householdID: householdID)
         let recipeID = UUID().uuidString
         let imageURL = try input.imageData.map { try store.persistImageData($0, fileName: recipeID) }
+        let extraction = input.aiExtraction?.hasMeaningfulContent == true ? input.aiExtraction : nil
+        let description = input.description.isEmpty ? (extraction?.summary ?? "") : input.description
 
         var recipes = store.recipesByHousehold[householdID] ?? []
         let recipe = Recipe(
             id: recipeID,
             householdID: householdID,
             title: input.title.isEmpty ? "Untitled Recipe" : input.title,
-            description: input.description,
+            description: description,
             sourceURL: input.sourceURL.isEmpty ? nil : input.sourceURL,
             imageURL: imageURL,
             savedDate: now,
@@ -207,7 +209,12 @@ final class DemoRecipeService: RecipeServicing {
             tagNames: tags.map(\.name),
             isFavorite: false,
             averageRating: input.initialRating > 0 ? Double(input.initialRating) : nil,
-            reviewCount: input.initialRating > 0 ? 1 : 0
+            reviewCount: input.initialRating > 0 ? 1 : 0,
+            ingredients: extraction?.ingredients ?? [],
+            preparationSteps: extraction?.preparationSteps ?? [],
+            aiNotes: extraction?.notes ?? [],
+            aiSummary: normalizedOptionalString(extraction?.summary),
+            aiConfidence: extraction?.confidence
         )
         recipes.insert(recipe, at: 0)
         store.recipesByHousehold[householdID] = recipes
@@ -365,6 +372,16 @@ final class DemoRecipeService: RecipeServicing {
             .filter { !$0.isEmpty }
             .compactMap { tagName in tags.first(where: { $0.id == tagName.normalizedTag }) }
     }
+}
+
+private extension String {
+    var nilIfEmpty: String? {
+        trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+private func normalizedOptionalString(_ value: String?) -> String? {
+    value?.nilIfEmpty
 }
 
 private final class DemoAuthListener: AuthStateListening {

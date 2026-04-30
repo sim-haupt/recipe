@@ -5,6 +5,7 @@ struct AppEnvironment {
     let householdService: HouseholdServicing
     let recipeService: RecipeServicing
     let urlImportService: RecipeURLImportServicing
+    let recipeEnrichmentService: RecipeEnrichmentServicing
     let sharedDraftStore: SharedDraftStore
     let mode: AppMode
 
@@ -18,6 +19,7 @@ struct AppEnvironment {
         householdService: FirestoreHouseholdService(),
         recipeService: FirestoreRecipeService(),
         urlImportService: RecipeURLImportService(),
+        recipeEnrichmentService: RecipeEnrichmentService(),
         sharedDraftStore: SharedDraftStore(),
         mode: .firebase
     )
@@ -27,6 +29,7 @@ struct AppEnvironment {
         householdService: DemoHouseholdService(),
         recipeService: DemoRecipeService(),
         urlImportService: RecipeURLImportService(),
+        recipeEnrichmentService: RecipeEnrichmentService(),
         sharedDraftStore: SharedDraftStore(),
         mode: .demo
     )

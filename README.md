@@ -79,6 +79,49 @@ xcodegen generate
   - save into the shared App Group draft store
 - The main app imports saved drafts into Firestore when the home screen loads.
 
+## AI recipe extraction backend
+
+The iPhone app can enrich imported recipes with `ingredients`, `preparationSteps`, `notes`, and an AI summary. That should be done through your own backend, not directly from the app, so the OpenAI API key stays private.
+
+Backend scaffold:
+
+- [Backend/package.json](/Users/szy/Documents/GitHub/recipe/Backend/package.json)
+- [Backend/src/server.js](/Users/szy/Documents/GitHub/recipe/Backend/src/server.js)
+- [Backend/src/recipeExtractor.js](/Users/szy/Documents/GitHub/recipe/Backend/src/recipeExtractor.js)
+- [Backend/src/schema.js](/Users/szy/Documents/GitHub/recipe/Backend/src/schema.js)
+- [Backend/railway.json](/Users/szy/Documents/GitHub/recipe/Backend/railway.json)
+- [Backend/README.md](/Users/szy/Documents/GitHub/recipe/Backend/README.md)
+
+To use it:
+
+1. In `Backend/`, run `npm install`.
+2. Copy [Backend/.env.example](/Users/szy/Documents/GitHub/recipe/Backend/.env.example) to `.env` and set `OPENAI_API_KEY`.
+3. Start the backend with `npm run dev`.
+4. Set `RecipeEnrichmentAPIURL` in [WeCookin-Info.plist](/Users/szy/Documents/GitHub/recipe/Config/WeCookin-Info.plist) to `http://127.0.0.1:8787/api/recipe-extract` for simulator testing.
+
+The backend expects:
+
+```json
+{
+  "sourceURL": "https://example.com/recipe",
+  "title": "Recipe title",
+  "description": "Short description",
+  "rawText": "Cleaned page text or shared caption text"
+}
+```
+
+and returns:
+
+```json
+{
+  "summary": "Short recipe summary",
+  "ingredients": ["1 cup flour"],
+  "preparation_steps": ["Mix the ingredients."],
+  "notes": [],
+  "confidence": 0.84
+}
+```
+
 ## Instagram and third-party sharing limitations
 
 - Instagram often shares only a caption snippet, a link, or a thumbnail instead of full post metadata.

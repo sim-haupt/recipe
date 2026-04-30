@@ -12,6 +12,7 @@ final class AddRecipeViewModel: ObservableObject {
     private let userProfile: UserProfile
     private var urlImportTask: Task<Void, Never>?
     private var lastImportedURL: String?
+    private var importedRawText = ""
 
     init(environment: AppEnvironment, userProfile: UserProfile) {
         self.environment = environment
@@ -22,6 +23,7 @@ final class AddRecipeViewModel: ObservableObject {
         let trimmedURL = draft.sourceURL.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedURL.isEmpty else {
             urlImportTask?.cancel()
+            importedRawText = ""
             return
         }
 
@@ -53,6 +55,7 @@ final class AddRecipeViewModel: ObservableObject {
             if isNewImport || draft.description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 draft.description = imported.description
             }
+            importedRawText = imported.rawText
             draft.sourceURL = imported.canonicalURL
             if let imageData = imported.imageData {
                 selectedImageData = imageData
@@ -81,6 +84,8 @@ final class AddRecipeViewModel: ObservableObject {
                 await fetchMetadataFromSourceURL(force: true)
             }
 
+            let enrichment = await fetchAIExtractionIfPossible()
+
             let input = RecipeCreationInput(
                 title: draft.title.trimmingCharacters(in: .whitespacesAndNewlines),
                 description: draft.description.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -89,7 +94,8 @@ final class AddRecipeViewModel: ObservableObject {
                 tagNames: draft.tags,
                 imageData: selectedImageData,
                 initialComment: draft.comments.trimmingCharacters(in: .whitespacesAndNewlines),
-                initialRating: draft.rating
+                initialRating: draft.rating,
+                aiExtraction: enrichment
             )
             guard !input.title.isEmpty else {
                 errorMessage = "Paste a valid recipe link or enter a title before saving."
@@ -101,5 +107,17 @@ final class AddRecipeViewModel: ObservableObject {
             errorMessage = error.localizedDescription
             return false
         }
+    }
+
+    private func fetchAIExtractionIfPossible() async -> RecipeAIExtraction? {
+        let request = RecipeEnrichmentRequest(
+            sourceURL: draft.sourceURL.trimmingCharacters(in: .whitespacesAndNewlines),
+            title: draft.title.trimmingCharacters(in: .whitespacesAndNewlines),
+            description: draft.description.trimmingCharacters(in: .whitespacesAndNewlines),
+            rawText: importedRawText.trimmingCharacters(in: .whitespacesAndNewlines)
+        )
+
+        guard request.hasEnoughContent else { return nil }
+        return try? await environment.recipeEnrichmentService.enrichRecipeContent(using: request)
     }
 }

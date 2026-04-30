@@ -6,6 +6,7 @@ import UIKit
 struct ImportedSharePayload {
     var title: String
     var description: String
+    var rawText: String
     var sourceURL: String?
     var imageData: Data?
     var metadata: [String: String]
@@ -15,6 +16,7 @@ final class RecipeShareImporter {
     func extractPayload(from extensionItems: [NSExtensionItem]) async -> ImportedSharePayload {
         var title = ""
         var description = ""
+        var rawText = ""
         var sourceURL: String?
         var imageData: Data?
         var metadata: [String: String] = [:]
@@ -22,6 +24,7 @@ final class RecipeShareImporter {
         for item in extensionItems {
             if let attributedContent = item.attributedContentText?.string, !attributedContent.isEmpty {
                 description = append(description, with: attributedContent)
+                rawText = append(rawText, with: attributedContent)
             }
 
             if let attachments = item.attachments {
@@ -36,6 +39,7 @@ final class RecipeShareImporter {
                         } else {
                             title = inferTitle(from: text)
                         }
+                        rawText = append(rawText, with: text)
                     }
 
                     if imageData == nil, let data = await loadImageData(from: provider) {
@@ -59,6 +63,10 @@ final class RecipeShareImporter {
 
             if let remoteDescription = remoteMetadata?.bestDescription, description.isEmpty {
                 description = remoteDescription
+            }
+
+            if let remoteRawText = remoteMetadata?.rawText, !remoteRawText.isEmpty {
+                rawText = append(rawText, with: remoteRawText)
             }
 
             if imageData == nil {
@@ -86,6 +94,7 @@ final class RecipeShareImporter {
         return ImportedSharePayload(
             title: title,
             description: description,
+            rawText: rawText,
             sourceURL: sourceURL,
             imageData: imageData,
             metadata: metadata
@@ -151,6 +160,7 @@ final class RecipeShareImporter {
                 htmlMetadata?.twitterDescription,
                 htmlMetadata?.metaDescription
             ]),
+            rawText: htmlMetadata?.bodyText,
             imageURL: htmlMetadata?.imageURL,
             linkMetadata: linkMetadata
         )
@@ -269,6 +279,7 @@ private struct RemoteMetadata {
     let canonicalURL: URL
     let title: String?
     let description: String?
+    let rawText: String?
     let imageURL: URL?
     let linkMetadata: LPLinkMetadata?
 
@@ -285,6 +296,7 @@ private struct HTMLMetadata {
     let twitterDescription: String?
     let canonicalURL: URL?
     let imageURL: URL?
+    let bodyText: String?
 
     init(html: String, baseURL: URL) {
         pageTitle = HTMLMetadata.capture(in: html, pattern: "<title[^>]*>(.*?)</title>")
@@ -300,6 +312,7 @@ private struct HTMLMetadata {
         let imageValue = HTMLMetadata.metaContent(in: html, property: "og:image")
             ?? HTMLMetadata.metaContent(in: html, key: "twitter:image")
         imageURL = imageValue.flatMap { URL(string: $0, relativeTo: baseURL)?.absoluteURL }
+        bodyText = HTMLMetadata.extractBodyText(from: html)
     }
 
     private static func metaContent(in html: String, key: String? = nil, property: String? = nil) -> String? {
@@ -337,5 +350,25 @@ private struct HTMLMetadata {
             .replacingOccurrences(of: "&lt;", with: "<")
             .replacingOccurrences(of: "&gt;", with: ">")
             .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func extractBodyText(from html: String) -> String {
+        let withoutScripts = html
+            .replacingOccurrences(of: "<script[\\s\\S]*?</script>", with: " ", options: .regularExpression)
+            .replacingOccurrences(of: "<style[\\s\\S]*?</style>", with: " ", options: .regularExpression)
+
+        let withLineBreaks = withoutScripts
+            .replacingOccurrences(of: "(?i)</(p|div|section|article|li|h1|h2|h3|h4|h5|h6|br)>", with: "\n", options: .regularExpression)
+            .replacingOccurrences(of: "<[^>]+>", with: " ", options: .regularExpression)
+
+        let decoded = decodeHTMLEntities(withLineBreaks)
+        let normalizedLines = decoded
+            .components(separatedBy: .newlines)
+            .map { $0.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression).trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        return normalizedLines
+            .prefix(140)
+            .joined(separator: "\n")
     }
 }

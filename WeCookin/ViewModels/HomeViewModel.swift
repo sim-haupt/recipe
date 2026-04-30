@@ -130,7 +130,13 @@ final class HomeViewModel: ObservableObject {
                     tagNames: draft.tags,
                     imageData: environment.sharedDraftStore.imageData(for: draft),
                     initialComment: "",
-                    initialRating: 0
+                    initialRating: 0,
+                    aiExtraction: try? await environment.recipeEnrichmentService.enrichRecipeContent(using: RecipeEnrichmentRequest(
+                        sourceURL: draft.sourceURL ?? "",
+                        title: draft.title,
+                        description: draft.description,
+                        rawText: draft.rawText
+                    ))
                 )
 
                 try await environment.recipeService.createRecipe(input: input, householdID: householdID, author: userProfile)
@@ -149,5 +155,7 @@ final class HomeViewModel: ObservableObject {
             || recipe.createdByName.localizedCaseInsensitiveContains(query)
             || recipe.categories.contains(where: { $0.localizedCaseInsensitiveContains(query) })
             || recipe.tagNames.contains(where: { $0.localizedCaseInsensitiveContains(query) })
+            || recipe.ingredients.contains(where: { $0.localizedCaseInsensitiveContains(query) })
+            || recipe.preparationSteps.contains(where: { $0.localizedCaseInsensitiveContains(query) })
     }
 }

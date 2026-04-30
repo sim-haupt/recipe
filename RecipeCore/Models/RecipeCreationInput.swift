@@ -1,5 +1,18 @@
 import Foundation
 
+struct RecipeEnrichmentRequest: Hashable {
+    var sourceURL: String
+    var title: String
+    var description: String
+    var rawText: String
+
+    var hasEnoughContent: Bool {
+        !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || !rawText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+}
+
 struct RecipeCreationInput {
     var title: String
     var description: String
@@ -9,6 +22,7 @@ struct RecipeCreationInput {
     var imageData: Data?
     var initialComment: String
     var initialRating: Int
+    var aiExtraction: RecipeAIExtraction?
 
     var category: String? {
         categories.first

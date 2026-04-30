@@ -84,26 +84,35 @@ final class FirestoreRecipeService: RecipeServicing {
         let now = Date()
         let tags = try await ensureTags(tagNames: input.tagNames, householdID: householdID)
         let imageURL = try await uploadImageIfNeeded(input.imageData, householdID: householdID, recipeID: recipeID)
+        let extraction = input.aiExtraction?.hasMeaningfulContent == true ? input.aiExtraction : nil
+        let description = input.description.isEmpty ? (extraction?.summary ?? "") : input.description
 
         let recipeRef = recipesCollection(householdID: householdID).document(recipeID)
-        try await recipeRef.setData([
+        var payload: [String: Any] = [
             "householdID": householdID,
             "title": input.title,
-            "description": input.description,
-            "sourceURL": input.sourceURL.isEmpty ? NSNull() : input.sourceURL,
-            "imageURL": imageURL ?? NSNull(),
+            "description": description,
             "savedDate": Timestamp(date: now),
             "createdByUserID": author.id,
             "createdByName": author.displayName,
             "updatedAt": Timestamp(date: now),
-            "category": input.category ?? NSNull(),
             "categories": input.categories,
             "tagIDs": tags.map(\.id),
             "tagNames": tags.map(\.name),
             "isFavorite": false,
-            "averageRating": input.initialRating > 0 ? Double(input.initialRating) : NSNull(),
-            "reviewCount": input.initialRating > 0 ? 1 : 0
-        ])
+            "reviewCount": input.initialRating > 0 ? 1 : 0,
+            "ingredients": extraction?.ingredients ?? [],
+            "preparationSteps": extraction?.preparationSteps ?? [],
+            "aiNotes": extraction?.notes ?? []
+        ]
+        payload["sourceURL"] = input.sourceURL.isEmpty ? NSNull() : input.sourceURL
+        payload["imageURL"] = imageURL ?? NSNull()
+        payload["category"] = input.category ?? NSNull()
+        payload["averageRating"] = input.initialRating > 0 ? Double(input.initialRating) : NSNull()
+        payload["aiSummary"] = normalizedOptionalString(extraction?.summary) ?? NSNull()
+        payload["aiConfidence"] = extraction?.confidence ?? NSNull()
+
+        try await recipeRef.setData(payload)
 
         if !input.initialComment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             try await commentsCollection(householdID: householdID, recipeID: recipeID).document().setData([
@@ -311,7 +320,12 @@ private func mapRecipe(_ document: QueryDocumentSnapshot) -> Recipe {
         tagNames: data["tagNames"] as? [String] ?? [],
         isFavorite: data["isFavorite"] as? Bool ?? false,
         averageRating: data["averageRating"] as? Double,
-        reviewCount: data["reviewCount"] as? Int ?? 0
+        reviewCount: data["reviewCount"] as? Int ?? 0,
+        ingredients: data["ingredients"] as? [String] ?? [],
+        preparationSteps: data["preparationSteps"] as? [String] ?? [],
+        aiNotes: data["aiNotes"] as? [String] ?? [],
+        aiSummary: data["aiSummary"] as? String,
+        aiConfidence: data["aiConfidence"] as? Double
     )
 }
 
@@ -352,4 +366,14 @@ private func mapReview(_ document: QueryDocumentSnapshot) -> Review {
         createdAt: (data["createdAt"] as? Timestamp)?.dateValue() ?? Date(),
         updatedAt: (data["updatedAt"] as? Timestamp)?.dateValue() ?? Date()
     )
+}
+
+private extension String {
+    var nilIfEmpty: String? {
+        trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+private func normalizedOptionalString(_ value: String?) -> String? {
+    value?.nilIfEmpty
 }

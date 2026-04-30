@@ -1,5 +1,28 @@
 import Foundation
 
+struct RecipeAIExtraction: Codable, Hashable {
+    var summary: String
+    var ingredients: [String]
+    var preparationSteps: [String]
+    var notes: [String]
+    var confidence: Double?
+
+    var hasMeaningfulContent: Bool {
+        !summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || !ingredients.isEmpty
+            || !preparationSteps.isEmpty
+            || !notes.isEmpty
+    }
+
+    static let empty = RecipeAIExtraction(
+        summary: "",
+        ingredients: [],
+        preparationSteps: [],
+        notes: [],
+        confidence: nil
+    )
+}
+
 struct Recipe: Identifiable, Codable, Hashable {
     let id: String
     var householdID: String
@@ -17,6 +40,11 @@ struct Recipe: Identifiable, Codable, Hashable {
     var isFavorite: Bool
     var averageRating: Double?
     var reviewCount: Int
+    var ingredients: [String]
+    var preparationSteps: [String]
+    var aiNotes: [String]
+    var aiSummary: String?
+    var aiConfidence: Double?
 
     var category: String? {
         get { categories.first }
@@ -40,7 +68,12 @@ struct Recipe: Identifiable, Codable, Hashable {
         tagNames: [String],
         isFavorite: Bool,
         averageRating: Double?,
-        reviewCount: Int
+        reviewCount: Int,
+        ingredients: [String] = [],
+        preparationSteps: [String] = [],
+        aiNotes: [String] = [],
+        aiSummary: String? = nil,
+        aiConfidence: Double? = nil
     ) {
         self.id = id
         self.householdID = householdID
@@ -58,6 +91,11 @@ struct Recipe: Identifiable, Codable, Hashable {
         self.isFavorite = isFavorite
         self.averageRating = averageRating
         self.reviewCount = reviewCount
+        self.ingredients = Self.sanitizedStrings(ingredients)
+        self.preparationSteps = Self.sanitizedStrings(preparationSteps)
+        self.aiNotes = Self.sanitizedStrings(aiNotes)
+        self.aiSummary = normalizedOptionalString(aiSummary)
+        self.aiConfidence = aiConfidence
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -78,6 +116,11 @@ struct Recipe: Identifiable, Codable, Hashable {
         case isFavorite
         case averageRating
         case reviewCount
+        case ingredients
+        case preparationSteps
+        case aiNotes
+        case aiSummary
+        case aiConfidence
     }
 
     init(from decoder: any Decoder) throws {
@@ -100,6 +143,11 @@ struct Recipe: Identifiable, Codable, Hashable {
         isFavorite = try container.decode(Bool.self, forKey: .isFavorite)
         averageRating = try container.decodeIfPresent(Double.self, forKey: .averageRating)
         reviewCount = try container.decode(Int.self, forKey: .reviewCount)
+        ingredients = Self.sanitizedStrings(try container.decodeIfPresent([String].self, forKey: .ingredients) ?? [])
+        preparationSteps = Self.sanitizedStrings(try container.decodeIfPresent([String].self, forKey: .preparationSteps) ?? [])
+        aiNotes = Self.sanitizedStrings(try container.decodeIfPresent([String].self, forKey: .aiNotes) ?? [])
+        aiSummary = normalizedOptionalString(try container.decodeIfPresent(String.self, forKey: .aiSummary))
+        aiConfidence = try container.decodeIfPresent(Double.self, forKey: .aiConfidence)
     }
 
     func encode(to encoder: any Encoder) throws {
@@ -121,6 +169,11 @@ struct Recipe: Identifiable, Codable, Hashable {
         try container.encode(isFavorite, forKey: .isFavorite)
         try container.encodeIfPresent(averageRating, forKey: .averageRating)
         try container.encode(reviewCount, forKey: .reviewCount)
+        try container.encode(ingredients, forKey: .ingredients)
+        try container.encode(preparationSteps, forKey: .preparationSteps)
+        try container.encode(aiNotes, forKey: .aiNotes)
+        try container.encodeIfPresent(aiSummary, forKey: .aiSummary)
+        try container.encodeIfPresent(aiConfidence, forKey: .aiConfidence)
     }
 
     private static func sanitizedCategories(_ categories: [String]) -> [String] {
@@ -130,4 +183,20 @@ struct Recipe: Identifiable, Codable, Hashable {
             .filter { !$0.isEmpty }
             .filter { seen.insert($0).inserted }
     }
+
+    private static func sanitizedStrings(_ values: [String]) -> [String] {
+        values
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+}
+
+private extension String {
+    var nilIfEmpty: String? {
+        isEmpty ? nil : self
+    }
+}
+
+private func normalizedOptionalString(_ value: String?) -> String? {
+    value?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
 }

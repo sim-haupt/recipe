@@ -4,6 +4,7 @@ struct RecipeDraft: Identifiable, Codable, Hashable {
     let id: String
     var title: String
     var description: String
+    var rawText: String
     var sourceURL: String?
     var imageFileName: String?
     var categories: [String]
@@ -21,6 +22,7 @@ struct RecipeDraft: Identifiable, Codable, Hashable {
         id: String,
         title: String,
         description: String,
+        rawText: String = "",
         sourceURL: String?,
         imageFileName: String?,
         category: String? = nil,
@@ -33,6 +35,7 @@ struct RecipeDraft: Identifiable, Codable, Hashable {
         self.id = id
         self.title = title
         self.description = description
+        self.rawText = rawText
         self.sourceURL = sourceURL
         self.imageFileName = imageFileName
         self.categories = categories.isEmpty ? (category.map { [$0] } ?? []) : categories
@@ -46,6 +49,7 @@ struct RecipeDraft: Identifiable, Codable, Hashable {
         case id
         case title
         case description
+        case rawText
         case sourceURL
         case imageFileName
         case category
@@ -61,6 +65,7 @@ struct RecipeDraft: Identifiable, Codable, Hashable {
         id = try container.decode(String.self, forKey: .id)
         title = try container.decode(String.self, forKey: .title)
         description = try container.decode(String.self, forKey: .description)
+        rawText = try container.decodeIfPresent(String.self, forKey: .rawText) ?? ""
         sourceURL = try container.decodeIfPresent(String.self, forKey: .sourceURL)
         imageFileName = try container.decodeIfPresent(String.self, forKey: .imageFileName)
         let decodedCategories = try container.decodeIfPresent([String].self, forKey: .categories)
@@ -77,6 +82,7 @@ struct RecipeDraft: Identifiable, Codable, Hashable {
         try container.encode(id, forKey: .id)
         try container.encode(title, forKey: .title)
         try container.encode(description, forKey: .description)
+        try container.encode(rawText, forKey: .rawText)
         try container.encodeIfPresent(sourceURL, forKey: .sourceURL)
         try container.encodeIfPresent(imageFileName, forKey: .imageFileName)
         try container.encode(categories, forKey: .categories)
@@ -91,6 +97,7 @@ struct RecipeDraft: Identifiable, Codable, Hashable {
         id: UUID().uuidString,
         title: "",
         description: "",
+        rawText: "",
         sourceURL: nil,
         imageFileName: nil,
         categories: [],

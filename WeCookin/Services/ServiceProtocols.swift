@@ -28,6 +28,10 @@ protocol HouseholdServicing {
     func joinHousehold(inviteCode: String, user: UserProfile) async throws -> Household
 }
 
+protocol RecipeEnrichmentServicing {
+    func enrichRecipeContent(using request: RecipeEnrichmentRequest) async throws -> RecipeAIExtraction?
+}
+
 protocol RecipeServicing {
     func observeRecipes(householdID: String, onChange: @escaping (Result<[Recipe], Error>) -> Void) -> RealtimeListening
     func observeTags(householdID: String, onChange: @escaping (Result<[Tag], Error>) -> Void) -> RealtimeListening

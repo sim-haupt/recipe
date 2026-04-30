@@ -9,6 +9,7 @@ final class ShareViewModel: ObservableObject {
 
     @Published var title = ""
     @Published var description = ""
+    @Published var rawText = ""
     @Published var sourceURL = ""
     @Published var selectedCategories = Set<String>()
     @Published var imageData: Data?
@@ -35,6 +36,7 @@ final class ShareViewModel: ObservableObject {
         let payload = await importer.extractPayload(from: extensionItems)
         title = payload.title
         description = payload.description
+        rawText = payload.rawText
         sourceURL = payload.sourceURL ?? ""
         imageData = payload.imageData
         isLoading = false
@@ -57,6 +59,7 @@ final class ShareViewModel: ObservableObject {
                 id: UUID().uuidString,
                 title: title.trimmingCharacters(in: .whitespacesAndNewlines).ifEmpty("Untitled Recipe"),
                 description: description.trimmingCharacters(in: .whitespacesAndNewlines),
+                rawText: rawText.trimmingCharacters(in: .whitespacesAndNewlines),
                 sourceURL: sourceURL.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
                 imageFileName: nil,
                 categories: selectedCategories.sorted(),
