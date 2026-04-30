@@ -28,6 +28,7 @@ struct RecipeCardView: View {
         .overlay {
             RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .stroke(RecipeTheme.strokeSoft, lineWidth: 1)
+                .allowsHitTesting(false)
         }
         .shadow(color: RecipeTheme.mintShadow, radius: 18, y: 10)
         .frame(width: cardWidth)
@@ -46,6 +47,7 @@ struct RecipeCardView: View {
                             startPoint: .top,
                             endPoint: .bottom
                         )
+                        .allowsHitTesting(false)
                     }
                     .clipShape(
                         UnevenRoundedRectangle(

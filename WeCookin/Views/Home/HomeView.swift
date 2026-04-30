@@ -178,6 +178,7 @@ struct HomeView: View {
                                         style: .continuous
                                     )
                                     .stroke(Color.white.opacity(0.72), lineWidth: 1)
+                                    .allowsHitTesting(false)
                                 }
                                 .shadow(color: RecipeTheme.shadow.opacity(0.08), radius: 22, y: -2)
                             }
@@ -186,9 +187,9 @@ struct HomeView: View {
                         .frame(minHeight: proxy.size.height, alignment: .top)
                     }
                     .scrollDismissesKeyboard(.interactively)
-                    .onTapGesture {
+                    .simultaneousGesture(TapGesture().onEnded {
                         isSearchFocused = false
-                    }
+                    })
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
@@ -531,6 +532,7 @@ private struct HeroSearchBar: View {
                         Image(systemName: "slider.horizontal.3")
                             .font(.system(size: 17, weight: .bold))
                             .foregroundStyle(activeFilterCount > 0 ? RecipeTheme.accentStrong : Color.black.opacity(0.36))
+                            .allowsHitTesting(false)
                     }
                     .overlay(alignment: .topTrailing) {
                         if activeFilterCount > 0 {
@@ -541,6 +543,7 @@ private struct HeroSearchBar: View {
                                 .background(RecipeTheme.accentStrong)
                                 .clipShape(Capsule())
                                 .offset(x: 8, y: -8)
+                                .allowsHitTesting(false)
                         }
                     }
                 .shadow(color: Color.black.opacity(0.08), radius: 10, y: 5)
@@ -590,10 +593,12 @@ private struct RecipeTabButton: View {
             .overlay {
                 RoundedRectangle(cornerRadius: 22, style: .continuous)
                     .stroke(isSelected ? Color.clear : RecipeTheme.strokeSoft, lineWidth: 1)
+                    .allowsHitTesting(false)
             }
             .shadow(color: isSelected ? RecipeTheme.mintShadow : RecipeTheme.shadow.opacity(0.05), radius: 12, y: 6)
         }
         .buttonStyle(PressableScaleButtonStyle())
+        .contentShape(Rectangle())
     }
 }
 
@@ -630,7 +635,9 @@ private struct RecipeViewSwitcher: View {
         .overlay {
             Capsule()
                 .stroke(RecipeTheme.strokeSoft, lineWidth: 1)
+                .allowsHitTesting(false)
         }
+        .contentShape(Rectangle())
     }
 
     private func switcherButton(systemName: String, style: RecipeFeedStyle) -> some View {
@@ -658,6 +665,7 @@ private struct CategoryBadge: View {
     var body: some View {
         CategoryPill(title: title, isSelected: isSelected, style: .outlined, action: action)
             .buttonStyle(PressableScaleButtonStyle())
+            .contentShape(Rectangle())
     }
 }
 
@@ -708,6 +716,7 @@ private struct HomeEmptyCard: View {
             .overlay {
                 RoundedRectangle(cornerRadius: 22, style: .continuous)
                     .stroke(RecipeTheme.strokeSoft, lineWidth: 1)
+                    .allowsHitTesting(false)
             }
     }
 }
@@ -810,6 +819,7 @@ private struct RecipeFilterSheet: View {
             .overlay {
                 Capsule()
                     .stroke(minimumRating == value ? Color.clear : RecipeTheme.strokeSoft, lineWidth: 1)
+                    .allowsHitTesting(false)
             }
         }
         .buttonStyle(PressableScaleButtonStyle())

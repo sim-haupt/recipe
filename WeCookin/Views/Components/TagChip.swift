@@ -24,6 +24,7 @@ struct TagChip: View {
             .overlay {
                 Capsule()
                     .stroke(isSelected ? Color.clear : RecipeTheme.accent.opacity(0.12), lineWidth: 1)
+                    .allowsHitTesting(false)
             }
         }
         .buttonStyle(.plain)
@@ -58,7 +59,7 @@ struct CategoryPill: View {
     private var pillContent: some View {
         Text(title)
             .font(.system(size: compact ? 11 : 13, weight: .semibold, design: .rounded))
-            .foregroundStyle(style == .filled ? Color.white : RecipeCategory.color(for: title))
+            .foregroundStyle(foregroundColor)
             .padding(.horizontal, compact ? 10 : 14)
             .padding(.vertical, compact ? 6 : 9)
             .background(
@@ -83,7 +84,9 @@ struct CategoryPill: View {
         case .filled:
             return AnyShapeStyle(RecipeCategory.gradient(for: title))
         case .outlined:
-            return AnyShapeStyle(Color.white.opacity(0.96))
+            return isSelected
+                ? AnyShapeStyle(RecipeCategory.gradient(for: title))
+                : AnyShapeStyle(Color.white.opacity(0.96))
         }
     }
 
@@ -92,7 +95,18 @@ struct CategoryPill: View {
         case .filled:
             return Color.white.opacity(isSelected ? 0.66 : 0.26)
         case .outlined:
-            return RecipeCategory.color(for: title).opacity(isSelected ? 0.88 : 0.54)
+            return isSelected
+                ? Color.clear
+                : RecipeCategory.color(for: title).opacity(0.54)
+        }
+    }
+
+    private var foregroundColor: Color {
+        switch style {
+        case .filled:
+            return .white
+        case .outlined:
+            return isSelected ? .white : RecipeCategory.color(for: title)
         }
     }
 }
