@@ -6,6 +6,7 @@ import { extractRecipeContent } from "./recipeExtractor.js";
 
 const app = express();
 const port = Number(process.env.PORT || 8787);
+const host = "0.0.0.0";
 
 app.use(express.json({ limit: "1mb" }));
 
@@ -34,6 +35,6 @@ app.use((_request, response) => {
   });
 });
 
-app.listen(port, () => {
-  console.log(`WeCookin AI enrichment backend listening on port ${port}`);
+app.listen(port, host, () => {
+  console.log(`WeCookin AI enrichment backend listening on http://${host}:${port}`);
 });
