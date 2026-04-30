@@ -43,28 +43,39 @@ struct CategoryPill: View {
     var action: (() -> Void)? = nil
 
     var body: some View {
-        Button(action: { action?() }) {
-            Text(title)
-                .font(.system(size: compact ? 11 : 13, weight: .semibold, design: .rounded))
-                .foregroundStyle(style == .filled ? Color.white : RecipeCategory.color(for: title))
-                .padding(.horizontal, compact ? 10 : 14)
-                .padding(.vertical, compact ? 6 : 9)
-                .background(
-                    Capsule()
-                        .fill(backgroundStyle)
-                )
-                .overlay {
-                    Capsule()
-                        .stroke(borderColor, lineWidth: isSelected ? 1.2 : 1)
+        Group {
+            if let action {
+                Button(action: action) {
+                    pillContent
                 }
-                .shadow(
-                    color: RecipeCategory.color(for: title).opacity(style == .filled ? (isSelected ? 0.24 : 0.12) : (isSelected ? 0.14 : 0.08)),
-                    radius: isSelected ? 10 : 6,
-                    y: isSelected ? 5 : 3
-                )
-                .opacity(isSelected ? 1 : 0.94)
+                .buttonStyle(.plain)
+            } else {
+                pillContent
+            }
         }
-        .buttonStyle(.plain)
+    }
+
+    private var pillContent: some View {
+        Text(title)
+            .font(.system(size: compact ? 11 : 13, weight: .semibold, design: .rounded))
+            .foregroundStyle(style == .filled ? Color.white : RecipeCategory.color(for: title))
+            .padding(.horizontal, compact ? 10 : 14)
+            .padding(.vertical, compact ? 6 : 9)
+            .background(
+                Capsule()
+                    .fill(backgroundStyle)
+            )
+            .overlay {
+                Capsule()
+                    .stroke(borderColor, lineWidth: isSelected ? 1.2 : 1)
+                    .allowsHitTesting(false)
+            }
+            .shadow(
+                color: RecipeCategory.color(for: title).opacity(style == .filled ? (isSelected ? 0.24 : 0.12) : (isSelected ? 0.14 : 0.08)),
+                radius: isSelected ? 10 : 6,
+                y: isSelected ? 5 : 3
+            )
+            .opacity(isSelected ? 1 : 0.94)
     }
 
     private var backgroundStyle: AnyShapeStyle {
@@ -115,6 +126,7 @@ struct EditableTagEditor: View {
                     .overlay {
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
                             .stroke(Color.black.opacity(0.06), lineWidth: 1)
+                            .allowsHitTesting(false)
                     }
                     .submitLabel(.done)
                     .onSubmit {

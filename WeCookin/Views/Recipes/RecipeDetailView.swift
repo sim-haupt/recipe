@@ -451,17 +451,14 @@ struct RecipeDetailView: View {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 10)], spacing: 10) {
                         ForEach(RecipeCategory.allTitles, id: \.self) { category in
                             let isSelected = viewModel.editableCategories.contains(category)
-                            Button {
+                            CategoryPill(title: category, isSelected: isSelected, style: .outlined) {
                                 if isSelected {
                                     viewModel.editableCategories.remove(category)
                                 } else {
                                     viewModel.editableCategories.insert(category)
                                 }
-                            } label: {
-                                CategoryPill(title: category, isSelected: isSelected, style: .outlined)
-                                    .frame(maxWidth: .infinity)
                             }
-                            .buttonStyle(.plain)
+                            .frame(maxWidth: .infinity)
                         }
                     }
 

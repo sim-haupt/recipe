@@ -88,7 +88,7 @@ export async function extractRecipeContent(payload) {
     throw error;
   }
 
-  return normalizeExtraction(parsed);
+  return normalizeExtraction(parsed, enrichedRequest);
 }
 
 function normalizePayload(payload = {}) {
@@ -100,12 +100,17 @@ function normalizePayload(payload = {}) {
   };
 }
 
-function normalizeExtraction(value = {}) {
+function normalizeExtraction(value = {}, request = {}) {
+  const heuristic = heuristicExtractionFromRequest(request);
+  const ingredients = normalizeRecipeArray(value.ingredients, 40, 240);
+  const preparationSteps = normalizeRecipeArray(value.preparation_steps, 30, 360);
+  const notes = normalizeRecipeArray(value.notes, 12, 300);
+
   return {
     summary: clampString(value.summary, 3000).replace(/\s+/g, " ").trim(),
-    ingredients: normalizeStringArray(value.ingredients, 40, 240),
-    preparation_steps: normalizeStringArray(value.preparation_steps, 30, 500),
-    notes: normalizeStringArray(value.notes, 12, 300),
+    ingredients: shouldUseHeuristicIngredients(ingredients) ? heuristic.ingredients : ingredients,
+    preparation_steps: shouldUseHeuristicPreparation(preparationSteps, heuristic.ingredients) ? heuristic.preparation_steps : preparationSteps,
+    notes: notes.length > 0 ? notes : heuristic.notes,
     confidence: normalizeConfidence(value.confidence)
   };
 }
@@ -117,6 +122,14 @@ function normalizeStringArray(value, maxItems, maxLength) {
 
   return value
     .map((item) => clampString(item, maxLength))
+    .filter(Boolean)
+    .slice(0, maxItems);
+}
+
+function normalizeRecipeArray(value, maxItems, maxLength) {
+  return normalizeStringArray(value, maxItems, maxLength)
+    .flatMap(splitCompoundEntry)
+    .map(cleanRecipeLine)
     .filter(Boolean)
     .slice(0, maxItems);
 }
@@ -138,12 +151,20 @@ function clampString(value, maxLength) {
 }
 
 function buildUserPrompt(payload) {
+  const candidateText = normalizeRecipeCandidateText(
+    [payload.description, payload.rawText, payload.fetchedDescription, payload.fetchedText]
+      .filter(Boolean)
+      .join("\n")
+  );
+
   return [
     `Source URL: ${payload.sourceURL || ""}`,
     `Title: ${payload.title || ""}`,
     `Description: ${payload.description || ""}`,
     `Fetched page title: ${payload.fetchedTitle || ""}`,
     `Fetched page description: ${payload.fetchedDescription || ""}`,
+    "Candidate recipe text:",
+    candidateText || "",
     "Raw text:",
     payload.rawText || "",
     "Fetched page text:",
@@ -208,7 +229,7 @@ async function fetchRemotePageContext(sourceURL) {
   return {
     title: clampString(decodeEntities(title || ""), 1200),
     description: clampString(decodeEntities(description || ""), 3000),
-    text: clampString(text || decodeEntities(description || ""), FETCHED_TEXT_LENGTH)
+    text: clampString(normalizeRecipeCandidateText(text || decodeEntities(description || "")), FETCHED_TEXT_LENGTH)
   };
 }
 
@@ -224,7 +245,7 @@ function extractPageText(html) {
     .replace(/<\/(p|div|section|article|li|ul|ol|h1|h2|h3|h4|h5|h6|br|tr)>/gi, "\n")
     .replace(/<[^>]+>/g, " ");
 
-  const normalizedLines = decodeEntities(withLineBreaks)
+  const normalizedLines = normalizeRecipeCandidateText(decodeEntities(withLineBreaks))
     .split(/\n+/)
     .map((line) => line.replace(/\s+/g, " ").trim())
     .filter(Boolean)
@@ -233,6 +254,18 @@ function extractPageText(html) {
   const focused = focusRecipeLines(normalizedLines);
   const selected = focused.length > 0 ? focused : normalizedLines.slice(0, 80);
   return selected.join("\n");
+}
+
+function normalizeRecipeCandidateText(value) {
+  return decodeEntities(value || "")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .replace(/\b(REZEPT|RECIPE)\b/gi, "\n$1")
+    .replace(/\b(ZUTATEN|INGREDIENTS|INSTRUCTIONS|DIRECTIONS|METHOD|PREPARATION|NOTES|TIPPS|TIPS|TO ASSEMBLE|ZUM ZUSAMMENBAUEN)\b\s*:?/gi, "\n$&\n")
+    .replace(/\s+-(?=\d|[A-Za-zÄÖÜäöü])/g, "\n-")
+    .replace(/([.!?])\s+(?=(Add|Mix|Chop|Serve|Assemble|Cook|Bake|Fry|Heat|Stir|Whisk|Combine|Fold|Alles|Mit|Dann|Zum|Vermischen|Braten|Servieren|Zusammenbauen)\b)/gi, "$1\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 function focusRecipeLines(lines) {
@@ -337,7 +370,8 @@ function decodeEntities(value) {
       const code = Number.parseInt(decimal, 10);
       return Number.isNaN(code) ? "" : String.fromCodePoint(code);
     })
-    .replace(/\s+/g, " ")
+    .replace(/[ \t\f\v]+/g, " ")
+    .replace(/ *\n+ */g, "\n")
     .trim();
 }
 
@@ -353,4 +387,91 @@ function dedupe(values) {
     seen.add(key);
     return true;
   });
+}
+
+function splitCompoundEntry(entry) {
+  const text = (entry || "").trim();
+  if (!text) return [];
+  if (text.length < 180 && !/\n/.test(text)) return [text];
+
+  return normalizeRecipeCandidateText(text)
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+function cleanRecipeLine(line) {
+  return clampString(
+    (line || "")
+      .replace(/^[-•]\s*/, "")
+      .replace(/^\d+[\.\)]\s*/, "")
+      .trim(),
+    360
+  );
+}
+
+function heuristicExtractionFromRequest(request = {}) {
+  const sourceText = normalizeRecipeCandidateText(
+    [request.description, request.rawText, request.fetchedDescription, request.fetchedText]
+      .filter(Boolean)
+      .join("\n")
+  );
+
+  const lines = sourceText
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const ingredients = dedupe(
+    lines
+      .filter(looksLikeIngredientLine)
+      .map(cleanRecipeLine)
+  ).slice(0, 24);
+
+  const preparation = dedupe(
+    lines
+      .filter(looksLikePreparationLine)
+      .map(cleanRecipeLine)
+  )
+    .filter((line) => !ingredients.includes(line))
+    .slice(0, 18);
+
+  const notes = dedupe(
+    lines
+      .filter((line) => /\b(fridge|refrigerator|keep|store|serves?|portion|prep time|cook time|kühlschrank|hält sich|portionen|zubereitungszeit)\b/i.test(line))
+      .map(cleanRecipeLine)
+  )
+    .filter((line) => !ingredients.includes(line) && !preparation.includes(line))
+    .slice(0, 8);
+
+  return {
+    ingredients,
+    preparation_steps: preparation,
+    notes
+  };
+}
+
+function looksLikeIngredientLine(line) {
+  const lower = line.toLowerCase();
+  if (lower.length > 180 || lower.includes("likes") || lower.includes("comments")) return false;
+  return /^[-•]/.test(line)
+    || /\b(\d+\/\d+|\d+(?:[.,]\d+)?)\s*(g|kg|ml|l|tbsp|tsp|el|tl|cup|cups|clove|cloves|dose|cans?)\b/i.test(line)
+    || /\b(onion|garlic|ginger|chickpeas?|tomato paste|mayo|lemon juice|bread|lettuce|cucumber|zwiebel|knoblauch|ingwer|kichererbsen|tomatenmark|zitrone)\b/i.test(lower);
+}
+
+function looksLikePreparationLine(line) {
+  const lower = line.toLowerCase();
+  if (lower.length < 12 || lower.includes("likes") || lower.includes("comments")) return false;
+  return /\b(add|mix|chop|serve|assemble|cook|bake|fry|heat|stir|whisk|combine|fold|marinate|vermischen|braten|servieren|zusammenbauen|klein schneiden|anbraten|belegen|genießen)\b/i.test(lower)
+    || /^to assemble:?$/i.test(line);
+}
+
+function shouldUseHeuristicIngredients(ingredients) {
+  return ingredients.length === 0 || (ingredients.length === 1 && ingredients[0].length > 220);
+}
+
+function shouldUseHeuristicPreparation(preparationSteps, heuristicIngredients) {
+  if (preparationSteps.length === 0) return true;
+  if (preparationSteps.length === 1 && preparationSteps[0].length > 260) return true;
+  return preparationSteps.every((line) => heuristicIngredients.includes(line));
 }

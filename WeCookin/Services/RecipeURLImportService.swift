@@ -57,7 +57,7 @@ final class RecipeURLImportService: RecipeURLImportServicing {
             from: descriptionSource,
             fallback: htmlMetadata?.bodyText ?? ""
         )
-        let rawText = ImportedTextSanitizer.cleanMultiline(
+        let rawText = ImportedTextSanitizer.normalizedRecipeExtractionText(from:
             firstNonEmpty([
                 htmlMetadata?.bodyText,
                 descriptionSource

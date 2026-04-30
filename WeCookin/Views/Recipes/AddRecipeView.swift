@@ -250,17 +250,14 @@ private struct CategorySelectionGrid: View {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 10)], spacing: 10) {
                 ForEach(RecipeCategory.allTitles, id: \.self) { category in
                     let isSelected = selectedCategories.contains(category)
-                    Button {
+                    CategoryPill(title: category, isSelected: isSelected, style: .outlined) {
                         if isSelected {
                             selectedCategories.removeAll { $0 == category }
                         } else {
                             selectedCategories.append(category)
                         }
-                    } label: {
-                        CategoryPill(title: category, isSelected: isSelected, style: .outlined)
-                            .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity)
                 }
             }
         }

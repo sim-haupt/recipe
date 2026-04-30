@@ -78,7 +78,7 @@ final class RecipeShareImporter {
             }
 
             if let remoteRawText = remoteMetadata?.rawText, !remoteRawText.isEmpty {
-                rawText = append(rawText, with: ImportedTextSanitizer.cleanMultiline(remoteRawText))
+                rawText = append(rawText, with: ImportedTextSanitizer.normalizedRecipeExtractionText(from: remoteRawText))
             }
 
             if imageData == nil {
@@ -109,7 +109,7 @@ final class RecipeShareImporter {
             rawText: rawText,
             aiSummary: nil
         )
-        rawText = ImportedTextSanitizer.cleanMultiline(rawText)
+        rawText = ImportedTextSanitizer.normalizedRecipeExtractionText(from: rawText)
 
         return ImportedSharePayload(
             title: title,

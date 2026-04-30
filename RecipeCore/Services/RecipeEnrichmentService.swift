@@ -86,7 +86,8 @@ private final class HeuristicRecipeEnrichmentService {
             rawText: request.rawText,
             aiSummary: nil
         )
-        let rawLines = request.rawText
+        let normalizedRecipeText = ImportedTextSanitizer.normalizedRecipeExtractionText(from: request.rawText)
+        let rawLines = normalizedRecipeText
             .components(separatedBy: .newlines)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
@@ -175,7 +176,7 @@ private final class HeuristicRecipeEnrichmentService {
         if lowercased.count < 18 { return false }
         if lowercased.contains("ingredients") { return false }
         return lowercased.range(of: #"^(\d+[\.\)]|step\s+\d+)"#, options: .regularExpression) != nil
-            || lowercased.range(of: #"\b(mix|stir|bake|cook|heat|whisk|combine|serve|add|preheat|simmer|boil|roast|grill|fold)\b"#, options: .regularExpression) != nil
+            || lowercased.range(of: #"\b(mix|stir|bake|cook|heat|whisk|combine|serve|add|preheat|simmer|boil|roast|grill|fold|chop|assemble|fry|marinate|vermischen|braten|servieren|zusammenbauen)\b"#, options: .regularExpression) != nil
     }
 
     private func normalizeListLine(_ line: String) -> String {
