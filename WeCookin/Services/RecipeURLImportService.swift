@@ -57,7 +57,12 @@ final class RecipeURLImportService: RecipeURLImportServicing {
             from: descriptionSource,
             fallback: htmlMetadata?.bodyText ?? ""
         )
-        let rawText = ImportedTextSanitizer.cleanMultiline(htmlMetadata?.bodyText ?? "")
+        let rawText = ImportedTextSanitizer.cleanMultiline(
+            firstNonEmpty([
+                htmlMetadata?.bodyText,
+                descriptionSource
+            ]) ?? ""
+        )
 
         let imageData = await fetchImageData(
             provider: linkMetadata?.imageProvider,

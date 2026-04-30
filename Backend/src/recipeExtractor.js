@@ -10,6 +10,8 @@ const SYSTEM_PROMPT = [
   "You extract structured recipe data from scraped webpage text or social post text.",
   "Use only the provided input.",
   "The scraped text may include navigation, related content, social captions, cookie text, or other page chrome.",
+  "For Instagram, TikTok, reels, or other social posts, the useful recipe content may appear only in the caption or page description.",
+  "When social captions contain ingredients or steps inline, extract them from dashed lines, numbered lines, emoji-prefixed lines, or short instruction sentences.",
   "Prioritize recipe-specific content such as structured ingredients, instructions, and notes.",
   "Ignore unrelated page text, author bios, comment prompts, navigation labels, and legal/footer text.",
   "Do not invent ingredients, quantities, or steps that are not supported by the source.",
@@ -206,7 +208,7 @@ async function fetchRemotePageContext(sourceURL) {
   return {
     title: clampString(decodeEntities(title || ""), 1200),
     description: clampString(decodeEntities(description || ""), 3000),
-    text: clampString(text, FETCHED_TEXT_LENGTH)
+    text: clampString(text || decodeEntities(description || ""), FETCHED_TEXT_LENGTH)
   };
 }
 

@@ -869,38 +869,42 @@ struct PressableScaleButtonStyle: ButtonStyle {
 private struct HomeLayoutMetrics {
     let availableWidth: CGFloat
 
-    var horizontalPadding: CGFloat { availableWidth < 380 ? 16 : 20 }
-    var sectionSpacing: CGFloat { availableWidth < 380 ? 22 : 26 }
-    var heroTopPadding: CGFloat { availableWidth < 380 ? 8 : 10 }
-    var heroBottomPadding: CGFloat { availableWidth < 380 ? 18 : 20 }
-    var avatarSize: CGFloat { availableWidth < 380 ? 44 : 48 }
-    var avatarFontSize: CGFloat { availableWidth < 380 ? 14 : 15 }
-    var heroTitleSize: CGFloat { availableWidth < 380 ? 17 : 18 }
-    var heroSubtitleSize: CGFloat { availableWidth < 380 ? 12 : 13 }
-    var heroActionSize: CGFloat { availableWidth < 380 ? 48 : 52 }
-    var heroActionIconSize: CGFloat { availableWidth < 380 ? 18 : 19 }
-    var searchBarHeight: CGFloat { availableWidth < 380 ? 44 : 46 }
-    var heroRingOne: CGFloat { availableWidth * 0.64 }
-    var heroRingTwo: CGFloat { availableWidth * 0.96 }
-    var heroRingOffsetOneY: CGFloat { availableWidth < 380 ? 10 : 14 }
-    var heroRingOffsetTwoY: CGFloat { availableWidth < 380 ? 18 : 24 }
+    private var safeAvailableWidth: CGFloat {
+        availableWidth.isFinite ? max(availableWidth, 1) : 1
+    }
 
-    var panelRadius: CGFloat { availableWidth < 380 ? 30 : 34 }
-    var panelTopPadding: CGFloat { availableWidth < 380 ? 20 : 24 }
-    var panelBottomPadding: CGFloat { availableWidth < 380 ? 28 : 32 }
+    var horizontalPadding: CGFloat { safeAvailableWidth < 380 ? 16 : 20 }
+    var sectionSpacing: CGFloat { safeAvailableWidth < 380 ? 22 : 26 }
+    var heroTopPadding: CGFloat { safeAvailableWidth < 380 ? 8 : 10 }
+    var heroBottomPadding: CGFloat { safeAvailableWidth < 380 ? 18 : 20 }
+    var avatarSize: CGFloat { safeAvailableWidth < 380 ? 44 : 48 }
+    var avatarFontSize: CGFloat { safeAvailableWidth < 380 ? 14 : 15 }
+    var heroTitleSize: CGFloat { safeAvailableWidth < 380 ? 17 : 18 }
+    var heroSubtitleSize: CGFloat { safeAvailableWidth < 380 ? 12 : 13 }
+    var heroActionSize: CGFloat { safeAvailableWidth < 380 ? 48 : 52 }
+    var heroActionIconSize: CGFloat { safeAvailableWidth < 380 ? 18 : 19 }
+    var searchBarHeight: CGFloat { safeAvailableWidth < 380 ? 44 : 46 }
+    var heroRingOne: CGFloat { max(safeAvailableWidth * 0.64, 1) }
+    var heroRingTwo: CGFloat { max(safeAvailableWidth * 0.96, 1) }
+    var heroRingOffsetOneY: CGFloat { safeAvailableWidth < 380 ? 10 : 14 }
+    var heroRingOffsetTwoY: CGFloat { safeAvailableWidth < 380 ? 18 : 24 }
 
-    var feedCardWidth: CGFloat { availableWidth - (horizontalPadding * 2) }
-    var feedImageHeight: CGFloat { availableWidth < 380 ? 208 : 232 }
-    var featuredCardTitleSize: CGFloat { availableWidth < 380 ? 17 : 18 }
-    var listCardWidth: CGFloat { availableWidth - (horizontalPadding * 2) }
-    var listImageWidth: CGFloat { availableWidth < 380 ? 124 : 132 }
-    var listImageHeight: CGFloat { availableWidth < 380 ? 108 : 116 }
-    var listCardTitleSize: CGFloat { availableWidth < 380 ? 15 : 16 }
+    var panelRadius: CGFloat { safeAvailableWidth < 380 ? 30 : 34 }
+    var panelTopPadding: CGFloat { safeAvailableWidth < 380 ? 20 : 24 }
+    var panelBottomPadding: CGFloat { safeAvailableWidth < 380 ? 28 : 32 }
 
-    var sectionCaptionSize: CGFloat { availableWidth < 380 ? 11 : 12 }
+    var feedCardWidth: CGFloat { max(safeAvailableWidth - (horizontalPadding * 2), 1) }
+    var feedImageHeight: CGFloat { safeAvailableWidth < 380 ? 208 : 232 }
+    var featuredCardTitleSize: CGFloat { safeAvailableWidth < 380 ? 17 : 18 }
+    var listCardWidth: CGFloat { max(safeAvailableWidth - (horizontalPadding * 2), 1) }
+    var listImageWidth: CGFloat { safeAvailableWidth < 380 ? 124 : 132 }
+    var listImageHeight: CGFloat { safeAvailableWidth < 380 ? 108 : 116 }
+    var listCardTitleSize: CGFloat { safeAvailableWidth < 380 ? 15 : 16 }
 
-    var backdropOrbOne: CGFloat { availableWidth * 0.84 }
-    var backdropOrbTwo: CGFloat { availableWidth * 0.68 }
+    var sectionCaptionSize: CGFloat { safeAvailableWidth < 380 ? 11 : 12 }
+
+    var backdropOrbOne: CGFloat { max(safeAvailableWidth * 0.84, 1) }
+    var backdropOrbTwo: CGFloat { max(safeAvailableWidth * 0.68, 1) }
 }
 
 private enum HomePreviewData {

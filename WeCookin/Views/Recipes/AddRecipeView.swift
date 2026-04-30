@@ -34,7 +34,8 @@ struct AddRecipeView: View {
                 guard let newValue else { return }
 
                 Task {
-                    viewModel.selectedImageData = try? await newValue.loadTransferable(type: Data.self)
+                    let loadedData = try? await newValue.loadTransferable(type: Data.self)
+                    viewModel.setCustomSelectedImageData(loadedData)
                 }
             }
             .toolbar {
@@ -73,20 +74,6 @@ struct AddRecipeView: View {
                     .foregroundStyle(RecipeTheme.textPrimary)
 
                 Spacer()
-
-                Button {
-                    guard let pastedValue = UIPasteboard.general.string else { return }
-                    viewModel.applyPastedSourceURL(from: pastedValue)
-                } label: {
-                    Label("Paste", systemImage: "doc.on.clipboard")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(RecipeTheme.textOnAccent)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 9)
-                        .background(RecipeTheme.accentStrong)
-                        .clipShape(Capsule())
-                }
-                .buttonStyle(.plain)
             }
 
             TextField("Paste a recipe link", text: $viewModel.draft.sourceURL)
@@ -209,7 +196,7 @@ struct AddRecipeView: View {
         .clipped()
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .overlay(alignment: .bottomLeading) {
-            Text(viewModel.selectedImageData == nil ? "Image from metadata" : "Custom image selected")
+            Text(viewModel.isUsingCustomImage ? "Custom image selected" : "Image from metadata")
                 .font(.system(size: 12, weight: .semibold, design: .rounded))
                 .foregroundStyle(.white)
                 .padding(.horizontal, 12)

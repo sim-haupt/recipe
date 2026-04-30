@@ -616,16 +616,20 @@ private extension View {
 private struct RecipeDetailLayoutMetrics {
     let availableWidth: CGFloat
 
-    var contentWidth: CGFloat { min(availableWidth - 32, 720) }
-    var horizontalPadding: CGFloat { availableWidth >= 768 ? 32 : 16 }
+    private var safeAvailableWidth: CGFloat {
+        availableWidth.isFinite ? max(availableWidth, 1) : 1
+    }
+
+    var contentWidth: CGFloat { min(max(safeAvailableWidth - 32, 1), 720) }
+    var horizontalPadding: CGFloat { safeAvailableWidth >= 768 ? 32 : 16 }
     var heroWidth: CGFloat { contentWidth }
     var heroHeight: CGFloat { min(max(contentWidth * 0.64, 260), 360) }
-    var commentImageWidth: CGFloat { contentWidth - (horizontalPadding * 2) }
-    var heroPadding: CGFloat { availableWidth < 360 ? 16 : 18 }
-    var heroTitleSize: CGFloat { availableWidth < 360 ? 24 : 28 }
-    var metaTitleSize: CGFloat { availableWidth < 360 ? 13 : 14 }
-    var bodyTextSize: CGFloat { availableWidth < 360 ? 14 : 15 }
-    var sectionTitleSize: CGFloat { availableWidth < 360 ? 19 : 21 }
-    var sectionSpacing: CGFloat { availableWidth < 360 ? 16 : 18 }
-    var cardPadding: CGFloat { availableWidth < 360 ? 14 : 16 }
+    var commentImageWidth: CGFloat { max(contentWidth - (horizontalPadding * 2), 1) }
+    var heroPadding: CGFloat { safeAvailableWidth < 360 ? 16 : 18 }
+    var heroTitleSize: CGFloat { safeAvailableWidth < 360 ? 24 : 28 }
+    var metaTitleSize: CGFloat { safeAvailableWidth < 360 ? 13 : 14 }
+    var bodyTextSize: CGFloat { safeAvailableWidth < 360 ? 14 : 15 }
+    var sectionTitleSize: CGFloat { safeAvailableWidth < 360 ? 19 : 21 }
+    var sectionSpacing: CGFloat { safeAvailableWidth < 360 ? 16 : 18 }
+    var cardPadding: CGFloat { safeAvailableWidth < 360 ? 14 : 16 }
 }

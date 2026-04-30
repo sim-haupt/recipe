@@ -8,27 +8,23 @@ final class AddRecipeViewModel: ObservableObject {
     @Published var isGeneratingPreview = false
     @Published var errorMessage: String?
     @Published var selectedImageData: Data?
+    @Published private(set) var isUsingCustomImage = false
 
     private let environment: AppEnvironment
     private let userProfile: UserProfile
     private var urlImportTask: Task<Void, Never>?
     private var lastImportedURL: String?
     private var importedRawText = ""
+    private var importedDescription = ""
     private var lastGeneratedExtraction: RecipeAIExtraction?
-
     init(environment: AppEnvironment, userProfile: UserProfile) {
         self.environment = environment
         self.userProfile = userProfile
     }
 
-    func applyPastedSourceURL(from pastedValue: String) {
-        let trimmedValue = pastedValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedValue.isEmpty else { return }
-
-        let detectedURL = firstURL(in: trimmedValue) ?? trimmedValue
-        draft.sourceURL = detectedURL
-        lastImportedURL = nil
-        scheduleURLImport()
+    func setCustomSelectedImageData(_ data: Data?) {
+        selectedImageData = data
+        isUsingCustomImage = data != nil
     }
 
     func scheduleURLImport() {
@@ -36,6 +32,7 @@ final class AddRecipeViewModel: ObservableObject {
         guard !trimmedURL.isEmpty else {
             urlImportTask?.cancel()
             importedRawText = ""
+            importedDescription = ""
             lastGeneratedExtraction = nil
             return
         }
@@ -64,8 +61,9 @@ final class AddRecipeViewModel: ObservableObject {
             let isNewImport = imported.canonicalURL != lastImportedURL
             draft.title = imported.title
             importedRawText = imported.rawText
+            importedDescription = imported.description
             draft.sourceURL = imported.canonicalURL
-            if let imageData = imported.imageData {
+            if !isUsingCustomImage, let imageData = imported.imageData {
                 selectedImageData = imageData
             }
             lastImportedURL = imported.canonicalURL
@@ -132,7 +130,9 @@ final class AddRecipeViewModel: ObservableObject {
         let request = RecipeEnrichmentRequest(
             sourceURL: draft.sourceURL.trimmingCharacters(in: .whitespacesAndNewlines),
             title: draft.title.trimmingCharacters(in: .whitespacesAndNewlines),
-            description: draft.description.trimmingCharacters(in: .whitespacesAndNewlines),
+            description: draft.description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? importedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+                : draft.description.trimmingCharacters(in: .whitespacesAndNewlines),
             rawText: importedRawText.trimmingCharacters(in: .whitespacesAndNewlines)
         )
 
@@ -189,14 +189,5 @@ final class AddRecipeViewModel: ObservableObject {
             .components(separatedBy: .newlines)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
-    }
-
-    private func firstURL(in text: String) -> String? {
-        guard let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue) else {
-            return nil
-        }
-
-        let range = NSRange(text.startIndex..<text.endIndex, in: text)
-        return detector.firstMatch(in: text, options: [], range: range)?.url?.absoluteString
     }
 }
