@@ -21,6 +21,16 @@ final class AddRecipeViewModel: ObservableObject {
         self.userProfile = userProfile
     }
 
+    func applyPastedSourceURL(from pastedValue: String) {
+        let trimmedValue = pastedValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedValue.isEmpty else { return }
+
+        let detectedURL = firstURL(in: trimmedValue) ?? trimmedValue
+        draft.sourceURL = detectedURL
+        lastImportedURL = nil
+        scheduleURLImport()
+    }
+
     func scheduleURLImport() {
         let trimmedURL = draft.sourceURL.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedURL.isEmpty else {
@@ -179,5 +189,14 @@ final class AddRecipeViewModel: ObservableObject {
             .components(separatedBy: .newlines)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
+    }
+
+    private func firstURL(in text: String) -> String? {
+        guard let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue) else {
+            return nil
+        }
+
+        let range = NSRange(text.startIndex..<text.endIndex, in: text)
+        return detector.firstMatch(in: text, options: [], range: range)?.url?.absoluteString
     }
 }

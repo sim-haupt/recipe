@@ -67,12 +67,31 @@ struct AddRecipeView: View {
 
     private var sourceLinkCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Recipe Link")
-                .font(.system(size: 17, weight: .bold, design: .rounded))
-                .foregroundStyle(RecipeTheme.textPrimary)
+            HStack(spacing: 12) {
+                Text("Recipe Link")
+                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .foregroundStyle(RecipeTheme.textPrimary)
+
+                Spacer()
+
+                Button {
+                    guard let pastedValue = UIPasteboard.general.string else { return }
+                    viewModel.applyPastedSourceURL(from: pastedValue)
+                } label: {
+                    Label("Paste", systemImage: "doc.on.clipboard")
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .foregroundStyle(RecipeTheme.textOnAccent)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 9)
+                        .background(RecipeTheme.accentStrong)
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+            }
 
             TextField("Paste a recipe link", text: $viewModel.draft.sourceURL)
                 .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
                 .keyboardType(.URL)
                 .textContentType(.URL)
                 .submitLabel(.go)
@@ -226,6 +245,7 @@ private extension View {
             .overlay {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .stroke(Color.black.opacity(0.06), lineWidth: 1)
+                    .allowsHitTesting(false)
             }
             .shadow(color: RecipeTheme.mintShadow.opacity(0.42), radius: 12, y: 6)
     }
