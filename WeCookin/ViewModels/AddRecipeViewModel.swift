@@ -6,7 +6,10 @@ final class AddRecipeViewModel: ObservableObject {
     @Published var isSaving = false
     @Published var isImportingURL = false
     @Published var isGeneratingPreview = false
+    @Published var isLoadingDebugInfo = false
     @Published var errorMessage: String?
+    @Published var debugErrorMessage: String?
+    @Published var debugInfo: RecipeEnrichmentDebugInfo?
     @Published var selectedImageData: Data?
     @Published private(set) var isUsingCustomImage = false
 
@@ -34,6 +37,8 @@ final class AddRecipeViewModel: ObservableObject {
             importedRawText = ""
             importedDescription = ""
             lastGeneratedExtraction = nil
+            debugInfo = nil
+            debugErrorMessage = nil
             return
         }
 
@@ -63,6 +68,8 @@ final class AddRecipeViewModel: ObservableObject {
             importedRawText = imported.rawText
             importedDescription = imported.description
             draft.sourceURL = imported.canonicalURL
+            debugInfo = nil
+            debugErrorMessage = nil
             if !isUsingCustomImage, let imageData = imported.imageData {
                 selectedImageData = imageData
             }
@@ -127,17 +134,29 @@ final class AddRecipeViewModel: ObservableObject {
     }
 
     private func fetchAIExtractionIfPossible() async -> RecipeAIExtraction? {
-        let request = RecipeEnrichmentRequest(
-            sourceURL: draft.sourceURL.trimmingCharacters(in: .whitespacesAndNewlines),
-            title: draft.title.trimmingCharacters(in: .whitespacesAndNewlines),
-            description: draft.description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                ? importedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
-                : draft.description.trimmingCharacters(in: .whitespacesAndNewlines),
-            rawText: importedRawText.trimmingCharacters(in: .whitespacesAndNewlines)
-        )
-
+        let request = buildEnrichmentRequest()
         guard request.hasEnoughContent else { return nil }
         return try? await environment.recipeEnrichmentService.enrichRecipeContent(using: request)
+    }
+
+    func loadDebugInfo() async {
+        let request = buildEnrichmentRequest()
+        guard request.hasEnoughContent else {
+            debugInfo = nil
+            debugErrorMessage = "Paste a recipe link first."
+            return
+        }
+
+        isLoadingDebugInfo = true
+        defer { isLoadingDebugInfo = false }
+
+        do {
+            debugInfo = try await environment.recipeEnrichmentService.debugRecipeContent(using: request)
+            debugErrorMessage = nil
+        } catch {
+            debugInfo = nil
+            debugErrorMessage = error.localizedDescription
+        }
     }
 
     private func generatePreviewContent(importedDescription: String, replaceExistingFields: Bool) async {
@@ -177,5 +196,16 @@ final class AddRecipeViewModel: ObservableObject {
             .components(separatedBy: .newlines)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
+    }
+
+    private func buildEnrichmentRequest() -> RecipeEnrichmentRequest {
+        RecipeEnrichmentRequest(
+            sourceURL: draft.sourceURL.trimmingCharacters(in: .whitespacesAndNewlines),
+            title: draft.title.trimmingCharacters(in: .whitespacesAndNewlines),
+            description: draft.description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? importedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+                : draft.description.trimmingCharacters(in: .whitespacesAndNewlines),
+            rawText: importedRawText.trimmingCharacters(in: .whitespacesAndNewlines)
+        )
     }
 }

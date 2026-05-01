@@ -2,6 +2,7 @@ import Foundation
 
 protocol RecipeEnrichmentServicing {
     func enrichRecipeContent(using request: RecipeEnrichmentRequest) async throws -> RecipeAIExtraction?
+    func debugRecipeContent(using request: RecipeEnrichmentRequest) async throws -> RecipeEnrichmentDebugInfo?
 }
 
 enum RecipeEnrichmentError: LocalizedError {
@@ -45,6 +46,28 @@ final class RecipeEnrichmentService: RecipeEnrichmentServicing {
 
         let fallbackExtraction = fallback.enrichRecipeContent(using: request)
         return fallbackExtraction.hasMeaningfulContent ? fallbackExtraction : nil
+    }
+
+    func debugRecipeContent(using request: RecipeEnrichmentRequest) async throws -> RecipeEnrichmentDebugInfo? {
+        guard request.hasEnoughContent else { return nil }
+        guard let debugEndpointURL = debugEndpointURL() else {
+            return RecipeEnrichmentDebugInfo.localFallback(from: request)
+        }
+
+        var urlRequest = URLRequest(url: debugEndpointURL)
+        urlRequest.httpMethod = "POST"
+        urlRequest.timeoutInterval = 25
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        urlRequest.httpBody = try JSONEncoder().encode(BackendRecipeEnrichmentRequest(from: request))
+
+        let (data, response) = try await session.data(for: urlRequest)
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200..<300).contains(httpResponse.statusCode) else {
+            throw RecipeEnrichmentError.backendUnavailable
+        }
+
+        let decoded = try JSONDecoder().decode(BackendRecipeEnrichmentDebugResponse.self, from: data)
+        return decoded.asDebugInfo
     }
 
     private func fetchBackendExtraction(request: RecipeEnrichmentRequest, endpointURL: URL) async throws -> RecipeAIExtraction {
@@ -111,6 +134,50 @@ final class RecipeEnrichmentService: RecipeEnrichmentServicing {
         let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
         return URL(string: trimmed)
+    }
+
+    private func debugEndpointURL() -> URL? {
+        guard let endpointURL else { return nil }
+        return endpointURL.deletingLastPathComponent().appendingPathComponent("recipe-extract-debug")
+    }
+}
+
+struct RecipeEnrichmentDebugInfo: Decodable {
+    let model: String
+    let systemPrompt: String
+    let userPrompt: String
+    let sourceURL: String
+    let title: String
+    let description: String
+    let rawText: String
+    let fetchedTitle: String
+    let fetchedDescription: String
+    let fetchedText: String
+    let candidateText: String
+    let extraction: RecipeAIExtraction
+
+    static func localFallback(from request: RecipeEnrichmentRequest) -> RecipeEnrichmentDebugInfo {
+        let normalizedRawText = ImportedTextSanitizer.normalizedRecipeExtractionText(from: request.rawText)
+        let summary = ImportedTextSanitizer.preferredRecipeDescription(
+            baseDescription: request.description,
+            rawText: request.rawText,
+            aiSummary: nil
+        )
+
+        return RecipeEnrichmentDebugInfo(
+            model: "local-heuristic-fallback",
+            systemPrompt: "Backend debug endpoint is unavailable. This is local app-side input only.",
+            userPrompt: "",
+            sourceURL: request.sourceURL,
+            title: request.title,
+            description: request.description,
+            rawText: request.rawText,
+            fetchedTitle: "",
+            fetchedDescription: "",
+            fetchedText: "",
+            candidateText: normalizedRawText,
+            extraction: RecipeAIExtraction(summary: summary, ingredients: [], confidence: nil)
+        )
     }
 }
 
@@ -220,4 +287,48 @@ private struct BackendRecipeEnrichmentResponse: Decodable {
             confidence: confidence
         )
     }
+}
+
+private struct BackendRecipeEnrichmentDebugResponse: Decodable {
+    let extraction: BackendRecipeEnrichmentResponse
+    let debug: BackendRecipeEnrichmentDebugPayload
+
+    var asDebugInfo: RecipeEnrichmentDebugInfo {
+        RecipeEnrichmentDebugInfo(
+            model: debug.model,
+            systemPrompt: debug.systemPrompt,
+            userPrompt: debug.userPrompt,
+            sourceURL: debug.normalizedRequest.sourceURL,
+            title: debug.normalizedRequest.title,
+            description: debug.normalizedRequest.description,
+            rawText: debug.normalizedRequest.rawText,
+            fetchedTitle: debug.fetchedContext.fetchedTitle,
+            fetchedDescription: debug.fetchedContext.fetchedDescription,
+            fetchedText: debug.fetchedContext.fetchedText,
+            candidateText: debug.candidateText,
+            extraction: extraction.asExtraction
+        )
+    }
+}
+
+private struct BackendRecipeEnrichmentDebugPayload: Decodable {
+    let model: String
+    let systemPrompt: String
+    let userPrompt: String
+    let normalizedRequest: BackendRecipeEnrichmentDebugRequest
+    let fetchedContext: BackendRecipeEnrichmentDebugFetchedContext
+    let candidateText: String
+}
+
+private struct BackendRecipeEnrichmentDebugRequest: Decodable {
+    let sourceURL: String
+    let title: String
+    let description: String
+    let rawText: String
+}
+
+private struct BackendRecipeEnrichmentDebugFetchedContext: Decodable {
+    let fetchedTitle: String
+    let fetchedDescription: String
+    let fetchedText: String
 }

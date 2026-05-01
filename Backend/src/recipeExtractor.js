@@ -28,6 +28,38 @@ const SYSTEM_PROMPT = [
 ].join(" ");
 
 export async function extractRecipeContent(payload) {
+  const prepared = await prepareRecipeRequest(payload);
+  return extractRecipeContentFromPreparedRequest(prepared);
+}
+
+export async function debugRecipeContent(payload) {
+  const prepared = await prepareRecipeRequest(payload);
+  const extraction = await extractRecipeContentFromPreparedRequest(prepared);
+  const userPrompt = buildUserPrompt(prepared.enrichedRequest);
+
+  return {
+    extraction,
+    debug: {
+      model: DEFAULT_MODEL,
+      systemPrompt: SYSTEM_PROMPT,
+      userPrompt,
+      normalizedRequest: {
+        sourceURL: prepared.request.sourceURL,
+        title: prepared.request.title,
+        description: prepared.request.description,
+        rawText: prepared.request.rawText
+      },
+      fetchedContext: {
+        fetchedTitle: prepared.enrichedRequest.fetchedTitle || "",
+        fetchedDescription: prepared.enrichedRequest.fetchedDescription || "",
+        fetchedText: prepared.enrichedRequest.fetchedText || ""
+      },
+      candidateText: extractCandidateText(prepared.enrichedRequest)
+    }
+  };
+}
+
+async function prepareRecipeRequest(payload) {
   const apiKey = process.env.OPENAI_API_KEY?.trim();
   if (!apiKey) {
     const error = new Error("Missing OPENAI_API_KEY.");
@@ -43,8 +75,11 @@ export async function extractRecipeContent(payload) {
   }
 
   const enrichedRequest = await enrichPayloadWithRemoteContent(request);
+  return { apiKey, request, enrichedRequest };
+}
 
-  const client = new OpenAI({ apiKey });
+async function extractRecipeContentFromPreparedRequest(prepared) {
+  const client = new OpenAI({ apiKey: prepared.apiKey });
   const response = await client.responses.create({
     model: DEFAULT_MODEL,
     input: [
@@ -62,7 +97,7 @@ export async function extractRecipeContent(payload) {
         content: [
           {
             type: "input_text",
-            text: buildUserPrompt(enrichedRequest)
+            text: buildUserPrompt(prepared.enrichedRequest)
           }
         ]
       }
@@ -93,7 +128,7 @@ export async function extractRecipeContent(payload) {
     throw error;
   }
 
-  return normalizeExtraction(parsed, enrichedRequest);
+  return normalizeExtraction(parsed, prepared.enrichedRequest);
 }
 
 function normalizePayload(payload = {}) {
@@ -151,11 +186,7 @@ function clampString(value, maxLength) {
 }
 
 function buildUserPrompt(payload) {
-  const candidateText = normalizeRecipeCandidateText(
-    [payload.description, payload.rawText, payload.fetchedDescription, payload.fetchedText]
-      .filter(Boolean)
-      .join("\n")
-  );
+  const candidateText = extractCandidateText(payload);
 
   return [
     "Extraction guidance:",
@@ -176,6 +207,14 @@ function buildUserPrompt(payload) {
     "Fetched page text:",
     payload.fetchedText || ""
   ].join("\n");
+}
+
+function extractCandidateText(payload) {
+  return normalizeRecipeCandidateText(
+    [payload.description, payload.rawText, payload.fetchedDescription, payload.fetchedText]
+      .filter(Boolean)
+      .join("\n")
+  );
 }
 
 async function enrichPayloadWithRemoteContent(payload) {

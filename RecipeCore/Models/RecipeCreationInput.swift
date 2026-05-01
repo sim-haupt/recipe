@@ -7,7 +7,8 @@ struct RecipeEnrichmentRequest: Hashable {
     var rawText: String
 
     var hasEnoughContent: Bool {
-        !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        !sourceURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             || !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             || !rawText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }

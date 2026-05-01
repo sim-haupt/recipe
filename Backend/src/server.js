@@ -2,7 +2,7 @@ import "dotenv/config";
 
 import express from "express";
 
-import { extractRecipeContent } from "./recipeExtractor.js";
+import { debugRecipeContent, extractRecipeContent } from "./recipeExtractor.js";
 
 const app = express();
 const port = Number(process.env.PORT || 8787);
@@ -21,6 +21,18 @@ app.post("/api/recipe-extract", async (request, response) => {
   try {
     const extraction = await extractRecipeContent(request.body);
     response.json(extraction);
+  } catch (error) {
+    const statusCode = Number.isInteger(error?.statusCode) ? error.statusCode : 500;
+    response.status(statusCode).json({
+      error: error instanceof Error ? error.message : "Unknown server error."
+    });
+  }
+});
+
+app.post("/api/recipe-extract-debug", async (request, response) => {
+  try {
+    const result = await debugRecipeContent(request.body);
+    response.json(result);
   } catch (error) {
     const statusCode = Number.isInteger(error?.statusCode) ? error.statusCode : 500;
     response.status(statusCode).json({
