@@ -92,18 +92,40 @@ final class DemoHouseholdService: HouseholdServicing {
         store.households[householdID]
     }
 
+    func loadHouseholds(householdIDs: [String]) async throws -> [Household] {
+        householdIDs.compactMap { store.households[$0] }
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
     func createUserProfile(userID: String, name: String, email: String) async throws {
         let now = Date()
         store.users[userID] = UserProfile(
             id: userID,
             displayName: name,
             email: email,
+            profileImageURL: nil,
             activeHouseholdID: nil,
             householdIDs: [],
             createdAt: now,
             updatedAt: now
         )
         store.saveSnapshotIfPossible()
+    }
+
+    func updateUserProfile(userID: String, name: String, imageData: Data?) async throws -> UserProfile {
+        guard var user = store.users[userID] else {
+            throw NSError(domain: "WeCookinDemo", code: 404, userInfo: [NSLocalizedDescriptionKey: "Could not find that demo profile."])
+        }
+
+        user.displayName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let imageData {
+            user.profileImageURL = try store.persistImageData(imageData, fileName: "profile-\(userID)")
+        }
+        user.updatedAt = Date()
+        store.users[userID] = user
+        store.saveSnapshotIfPossible()
+        store.notifyAuthObservers()
+        return user
     }
 
     func createHousehold(name: String, owner: UserProfile) async throws -> Household {
@@ -154,6 +176,22 @@ final class DemoHouseholdService: HouseholdServicing {
         store.saveSnapshotIfPossible()
         store.notifyAuthObservers()
         return updatedHousehold
+    }
+
+    func setActiveHousehold(userID: String, householdID: String) async throws -> UserProfile {
+        guard var user = store.users[userID] else {
+            throw NSError(domain: "WeCookinDemo", code: 404, userInfo: [NSLocalizedDescriptionKey: "Could not find that demo profile."])
+        }
+
+        user.activeHouseholdID = householdID
+        if !user.householdIDs.contains(householdID) {
+            user.householdIDs.append(householdID)
+        }
+        user.updatedAt = Date()
+        store.users[userID] = user
+        store.saveSnapshotIfPossible()
+        store.notifyAuthObservers()
+        return user
     }
 }
 

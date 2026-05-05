@@ -1,9 +1,14 @@
 import FirebaseFirestore
+import FirebaseStorage
 import Foundation
 
 final class FirestoreHouseholdService: HouseholdServicing {
     private var database: Firestore {
         Firestore.firestore()
+    }
+
+    private var storage: Storage {
+        Storage.storage()
     }
 
     func loadUserProfile(userID: String) async throws -> UserProfile? {
@@ -35,11 +40,31 @@ final class FirestoreHouseholdService: HouseholdServicing {
         return mapHousehold(document)
     }
 
+    func loadHouseholds(householdIDs: [String]) async throws -> [Household] {
+        try await withThrowingTaskGroup(of: Household?.self) { group in
+            for householdID in householdIDs {
+                group.addTask {
+                    try await self.loadHousehold(householdID: householdID)
+                }
+            }
+
+            var households: [Household] = []
+            for try await household in group {
+                if let household {
+                    households.append(household)
+                }
+            }
+
+            return households.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        }
+    }
+
     func createUserProfile(userID: String, name: String, email: String) async throws {
         let now = Date()
         let payload: [String: Any] = [
             "displayName": name,
             "email": email,
+            "profileImageURL": NSNull(),
             "activeHouseholdID": NSNull(),
             "householdIDs": [],
             "createdAt": Timestamp(date: now),
@@ -47,6 +72,26 @@ final class FirestoreHouseholdService: HouseholdServicing {
         ]
 
         try await database.collection("users").document(userID).setData(payload, merge: true)
+    }
+
+    func updateUserProfile(userID: String, name: String, imageData: Data?) async throws -> UserProfile {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        var payload: [String: Any] = [
+            "displayName": trimmedName,
+            "updatedAt": Timestamp(date: Date())
+        ]
+
+        if let imageData {
+            payload["profileImageURL"] = try await uploadProfileImage(imageData, userID: userID)
+        }
+
+        try await database.collection("users").document(userID).setData(payload, merge: true)
+
+        guard let updated = try await loadUserProfile(userID: userID) else {
+            throw NSError(domain: "WeCookin", code: 500, userInfo: [NSLocalizedDescriptionKey: "Could not reload the updated profile."])
+        }
+
+        return updated
     }
 
     func createHousehold(name: String, owner: UserProfile) async throws -> Household {
@@ -105,8 +150,26 @@ final class FirestoreHouseholdService: HouseholdServicing {
         return household
     }
 
+    func setActiveHousehold(userID: String, householdID: String) async throws -> UserProfile {
+        try await database.collection("users").document(userID).setData([
+            "activeHouseholdID": householdID,
+            "updatedAt": Timestamp(date: Date())
+        ], merge: true)
+
+        guard let updated = try await loadUserProfile(userID: userID) else {
+            throw NSError(domain: "WeCookin", code: 500, userInfo: [NSLocalizedDescriptionKey: "Could not reload the updated household selection."])
+        }
+        return updated
+    }
+
     private static func makeInviteCode() -> String {
         String(UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(6)).uppercased()
+    }
+
+    private func uploadProfileImage(_ data: Data, userID: String) async throws -> String {
+        let reference = storage.reference().child("users/\(userID)/profile.jpg")
+        _ = try await reference.putDataAwaitingResult(data)
+        return try await reference.downloadURLAwaitingResult().absoluteString
     }
 }
 
@@ -115,6 +178,7 @@ func mapUserProfile(id: String, data: [String: Any]) -> UserProfile {
         id: id,
         displayName: data["displayName"] as? String ?? "",
         email: data["email"] as? String ?? "",
+        profileImageURL: data["profileImageURL"] as? String,
         activeHouseholdID: data["activeHouseholdID"] as? String,
         householdIDs: data["householdIDs"] as? [String] ?? [],
         createdAt: (data["createdAt"] as? Timestamp)?.dateValue() ?? Date(),

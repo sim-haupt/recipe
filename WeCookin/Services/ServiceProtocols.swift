@@ -28,9 +28,12 @@ protocol HouseholdServicing {
     func loadUserProfile(userID: String) async throws -> UserProfile?
     func loadUserProfiles(userIDs: [String]) async throws -> [UserProfile]
     func loadHousehold(householdID: String) async throws -> Household?
+    func loadHouseholds(householdIDs: [String]) async throws -> [Household]
     func createUserProfile(userID: String, name: String, email: String) async throws
+    func updateUserProfile(userID: String, name: String, imageData: Data?) async throws -> UserProfile
     func createHousehold(name: String, owner: UserProfile) async throws -> Household
     func joinHousehold(inviteCode: String, user: UserProfile) async throws -> Household
+    func setActiveHousehold(userID: String, householdID: String) async throws -> UserProfile
 }
 
 protocol RecipeServicing {

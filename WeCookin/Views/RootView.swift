@@ -17,8 +17,10 @@ struct RootView: View {
                 } else if let userProfile = sessionViewModel.userProfile {
                     if userProfile.activeHouseholdID == nil {
                         HouseholdOnboardingView(userProfile: userProfile, environment: environment)
+                            .id("onboarding-\(userProfile.id)-\(sessionViewModel.pendingInviteCode ?? "none")")
                     } else {
                         HomeView(userProfile: userProfile, environment: environment)
+                            .id("home-\(userProfile.activeHouseholdID ?? "none")-\(userProfile.displayName)-\(userProfile.profileImageURL ?? "no-image")")
                     }
                 } else {
                     ProgressView("Preparing your account...")
@@ -38,6 +40,9 @@ struct RootView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(sessionViewModel.errorMessage ?? "")
+        }
+        .onOpenURL { url in
+            sessionViewModel.handleIncomingURL(url)
         }
     }
 }

@@ -131,6 +131,7 @@ struct HomeView: View {
                             HomeHeroSection(
                                 metrics: metrics,
                                 initials: userInitials,
+                                profileImageURL: userProfile.profileImageURL,
                                 greeting: "Hello, \(firstName)",
                                 subtitle: "What we cookin’?",
                                 searchText: currentSearchBinding,
@@ -215,7 +216,7 @@ struct HomeView: View {
                 )
             }
             .sheet(isPresented: $isShowingHouseholdSettings) {
-                HouseholdSettingsView(userProfile: userProfile, environment: environment)
+                HouseholdSettingsView(userProfile: sessionViewModel.userProfile ?? userProfile, environment: environment)
                     .environmentObject(sessionViewModel)
             }
             .task {
@@ -396,6 +397,7 @@ private enum RecipeFeedStyle {
 private struct HomeHeroSection: View {
     let metrics: HomeLayoutMetrics
     let initials: String
+    let profileImageURL: String?
     let greeting: String
     let subtitle: String
     @Binding var searchText: String
@@ -445,14 +447,22 @@ private struct HomeHeroSection: View {
                 HStack(alignment: .center, spacing: 14) {
                     HStack(spacing: 12) {
                         Button(action: householdAction) {
-                            ZStack {
-                                Circle()
-                                    .fill(Color.white.opacity(0.22))
-                                Text(initials)
-                                    .font(.system(size: metrics.avatarFontSize, weight: .bold, design: .rounded))
-                                    .foregroundStyle(RecipeTheme.textOnAccent)
+                            Group {
+                                if let profileImageURL {
+                                    RemoteRecipeImage(imageURL: profileImageURL, width: metrics.avatarSize, height: metrics.avatarSize)
+                                        .frame(width: metrics.avatarSize, height: metrics.avatarSize)
+                                        .clipShape(Circle())
+                                } else {
+                                    ZStack {
+                                        Circle()
+                                            .fill(Color.white.opacity(0.22))
+                                        Text(initials)
+                                            .font(.system(size: metrics.avatarFontSize, weight: .bold, design: .rounded))
+                                            .foregroundStyle(RecipeTheme.textOnAccent)
+                                    }
+                                    .frame(width: metrics.avatarSize, height: metrics.avatarSize)
+                                }
                             }
-                            .frame(width: metrics.avatarSize, height: metrics.avatarSize)
                         }
                         .buttonStyle(PressableScaleButtonStyle())
 

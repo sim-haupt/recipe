@@ -71,12 +71,19 @@ private final class MockHouseholdService: HouseholdServicing {
     func loadUserProfile(userID: String) async throws -> UserProfile? { nil }
     func loadUserProfiles(userIDs: [String]) async throws -> [UserProfile] { [] }
     func loadHousehold(householdID: String) async throws -> Household? { nil }
+    func loadHouseholds(householdIDs: [String]) async throws -> [Household] { [] }
     func createUserProfile(userID: String, name: String, email: String) async throws {}
+    func updateUserProfile(userID: String, name: String, imageData: Data?) async throws -> UserProfile {
+        UserProfile(id: userID, displayName: name, email: "", profileImageURL: nil, activeHouseholdID: nil, householdIDs: [], createdAt: Date(), updatedAt: Date())
+    }
     func createHousehold(name: String, owner: UserProfile) async throws -> Household {
         Household(id: "house-1", name: name, inviteCode: "invite", memberIDs: [owner.id], createdByUserID: owner.id, createdAt: Date(), updatedAt: Date())
     }
     func joinHousehold(inviteCode: String, user: UserProfile) async throws -> Household {
         Household(id: "house-1", name: "Home", inviteCode: inviteCode, memberIDs: [user.id], createdByUserID: user.id, createdAt: Date(), updatedAt: Date())
+    }
+    func setActiveHousehold(userID: String, householdID: String) async throws -> UserProfile {
+        UserProfile(id: userID, displayName: "Test User", email: "", profileImageURL: nil, activeHouseholdID: householdID, householdIDs: [householdID], createdAt: Date(), updatedAt: Date())
     }
 }
 

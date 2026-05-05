@@ -10,6 +10,7 @@ final class SessionViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var isLoading = true
     @Published var isSigningInWithApple = false
+    @Published var pendingInviteCode: String?
 
     private let environment: AppEnvironment
     private var authListener: AuthStateListening?
@@ -92,6 +93,7 @@ final class SessionViewModel: ObservableObject {
     func signOut() {
         do {
             try environment.authService.signOut()
+            pendingInviteCode = nil
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -101,9 +103,32 @@ final class SessionViewModel: ObservableObject {
         guard let session else { return }
         do {
             userProfile = try await environment.householdService.loadUserProfile(userID: session.userID)
+            await joinPendingInviteIfPossible()
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    func handleIncomingURL(_ url: URL) {
+        guard url.scheme?.lowercased() == "wecookin" else { return }
+
+        if url.host?.lowercased() == "join",
+           let inviteCode = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+            .queryItems?
+            .first(where: { $0.name == "code" })?
+            .value?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+           !inviteCode.isEmpty {
+            pendingInviteCode = inviteCode.uppercased()
+
+            Task {
+                await joinPendingInviteIfPossible()
+            }
+        }
+    }
+
+    func clearPendingInviteCode() {
+        pendingInviteCode = nil
     }
 
     private func handleAuthState(_ session: AuthSession?) async {
@@ -127,6 +152,7 @@ final class SessionViewModel: ObservableObject {
                 )
                 userProfile = try await environment.householdService.loadUserProfile(userID: session.userID)
             }
+            await joinPendingInviteIfPossible()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -162,6 +188,19 @@ final class SessionViewModel: ObservableObject {
     private static func formattedName(from components: PersonNameComponents?) -> String {
         guard let components else { return "" }
         return PersonNameComponentsFormatter().string(from: components).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func joinPendingInviteIfPossible() async {
+        guard let code = pendingInviteCode,
+              let userProfile else { return }
+
+        do {
+            _ = try await environment.householdService.joinHousehold(inviteCode: code, user: userProfile)
+            self.userProfile = try await environment.householdService.loadUserProfile(userID: userProfile.id)
+            pendingInviteCode = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     private static func sha256(_ input: String) -> String {
