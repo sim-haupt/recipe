@@ -1,13 +1,14 @@
 import PhotosUI
 import SwiftUI
 import UIKit
+import os
 
 struct AddRecipeView: View {
     @Environment(\.appEnvironment) private var environment
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel: AddRecipeViewModel
-    @State private var selectedPhoto: PhotosPickerItem?
-    @State private var isShowingDebugInspector = false
+    @State private var isShowingPreviewEditor = false
+    @FocusState private var isSourceURLFocused: Bool
 
     init(userProfile: UserProfile, environment: AppEnvironment = .demo) {
         _viewModel = StateObject(wrappedValue: AddRecipeViewModel(environment: environment, userProfile: userProfile))
@@ -17,8 +18,7 @@ struct AddRecipeView: View {
         NavigationStack {
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 18) {
-                    sourceLinkCard
-                    generatedPreviewCard
+                    sourceEntryCard
                 }
                 .padding(.horizontal, 18)
                 .padding(.top, 18)
@@ -28,31 +28,9 @@ struct AddRecipeView: View {
             .navigationTitle("Add Recipe")
             .navigationBarTitleDisplayMode(.inline)
             .tint(RecipeTheme.accentStrong)
-            .onChange(of: viewModel.draft.sourceURL) { _, _ in
-                viewModel.scheduleURLImport()
-            }
-            .onChange(of: selectedPhoto) { _, newValue in
-                guard let newValue else { return }
-
-                Task {
-                    let loadedData = try? await newValue.loadTransferable(type: Data.self)
-                    viewModel.setCustomSelectedImageData(loadedData)
-                }
-            }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") { dismiss() }
-                }
-
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Save") {
-                        Task {
-                            if await viewModel.save() {
-                                dismiss()
-                            }
-                        }
-                    }
-                    .disabled(viewModel.draft.sourceURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || viewModel.isSaving)
                 }
             }
             .alert("Unable to save", isPresented: Binding(
@@ -65,9 +43,33 @@ struct AddRecipeView: View {
             }
         }
         .environment(\.appEnvironment, environment)
+        .fullScreenCover(isPresented: $isShowingPreviewEditor) {
+            NavigationStack {
+                AddRecipePreviewEditorView(
+                    viewModel: viewModel,
+                    onBack: {
+                        viewModel.beginEditingSourceURL()
+                        isShowingPreviewEditor = false
+                        DispatchQueue.main.async {
+                            isSourceURLFocused = true
+                        }
+                    },
+                    onSave: {
+                        if await viewModel.save() {
+                            dismiss()
+                        }
+                    }
+                )
+            }
+        }
+        .task {
+            if !viewModel.hasResolvedSourcePreview {
+                isSourceURLFocused = true
+            }
+        }
     }
 
-    private var sourceLinkCard: some View {
+    private var sourceEntryCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 12) {
                 Text("Recipe Link")
@@ -83,37 +85,44 @@ struct AddRecipeView: View {
                 .keyboardType(.URL)
                 .textContentType(.URL)
                 .submitLabel(.go)
+                .focused($isSourceURLFocused)
                 .recipeFormInputStyle()
                 .onSubmit {
                     Task {
-                        await viewModel.fetchMetadataFromSourceURL(force: true)
+                        await startPreviewGeneration()
                     }
                 }
 
-            if viewModel.isImportingURL || viewModel.isGeneratingPreview {
-                VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Paste a link, then generate a separate editable preview with image, title, ingredients, categories, and tags.")
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .foregroundStyle(.secondary)
+
+                Button {
+                    Task {
+                        await startPreviewGeneration()
+                    }
+                } label: {
                     HStack(spacing: 10) {
-                        ProgressView()
-                            .controlSize(.small)
-                        Text(viewModel.isGeneratingPreview ? "Generating editable recipe preview…" : "Fetching recipe preview…")
-                            .font(.system(size: 13, weight: .medium, design: .rounded))
-                            .foregroundStyle(.secondary)
+                        if viewModel.isImportingURL || viewModel.isGeneratingPreview {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Image(systemName: "sparkles")
+                        }
+                        Text(viewModel.isGeneratingPreview
+                             ? "Generating editable recipe preview…"
+                             : (viewModel.isImportingURL ? "Fetching recipe preview…" : "Generate Preview"))
                     }
-
-                    if !viewModel.draft.sourceURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        inspectAIButton
-                    }
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundStyle(RecipeTheme.textOnAccent)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(RecipeTheme.accentStrong)
+                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                 }
-            } else {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("We’ll pull the image and title from the link, then generate an ingredient list for you to edit before saving.")
-                        .font(.system(size: 13, weight: .medium, design: .rounded))
-                        .foregroundStyle(.secondary)
-
-                    if !viewModel.draft.sourceURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        inspectAIButton
-                    }
-                }
+                .buttonStyle(.plain)
+                .disabled(viewModel.draft.sourceURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || viewModel.isImportingURL || viewModel.isGeneratingPreview)
             }
         }
         .padding(18)
@@ -126,9 +135,118 @@ struct AddRecipeView: View {
                 .allowsHitTesting(false)
         }
         .shadow(color: RecipeTheme.shadow.opacity(0.55), radius: 10, y: 6)
+    }
+    @MainActor
+    private func startPreviewGeneration() async {
+        isSourceURLFocused = false
+        await viewModel.generatePreviewFromSourceURL()
+        if viewModel.hasResolvedSourcePreview {
+            isShowingPreviewEditor = true
+        }
+    }
+}
+
+private struct AddRecipePreviewEditorView: View {
+    private static let logger = Logger(subsystem: "WeCookin", category: "AddRecipePreview")
+
+    @ObservedObject var viewModel: AddRecipeViewModel
+    let onBack: () -> Void
+    let onSave: () async -> Void
+    @State private var selectedPhoto: PhotosPickerItem?
+    @State private var isShowingDebugInspector = false
+    @State private var isPresentingImagePicker = false
+
+    var body: some View {
+        ScrollView(showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 18) {
+                previewSourceCard
+                generatedPreviewCard
+            }
+            .padding(.horizontal, 18)
+            .padding(.top, 18)
+            .padding(.bottom, 28)
+        }
+        .background(RecipeTheme.pageGradient.ignoresSafeArea())
+        .navigationTitle("Recipe Preview")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button("Back") {
+                    onBack()
+                }
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Save") {
+                    Task {
+                        await onSave()
+                    }
+                }
+                .disabled(!viewModel.hasResolvedSourcePreview || viewModel.isSaving)
+            }
+        }
         .sheet(isPresented: $isShowingDebugInspector) {
             debugInspectorSheet
         }
+        .photosPicker(isPresented: $isPresentingImagePicker, selection: $selectedPhoto, matching: .images)
+        .onChange(of: selectedPhoto) { _, newValue in
+            guard let newValue else { return }
+
+            Task {
+                let loadedData = try? await newValue.loadTransferable(type: Data.self)
+                viewModel.setCustomSelectedImageData(loadedData)
+            }
+        }
+        .onChange(of: isPresentingImagePicker) { _, isPresented in
+            Self.logger.debug("Change Image picker state changed: \(isPresented)")
+        }
+        .onChange(of: isShowingDebugInspector) { _, isPresented in
+            Self.logger.debug("Inspect AI Input sheet state changed: \(isPresented)")
+        }
+    }
+
+    private var previewSourceCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                Text("Recipe Link")
+                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .foregroundStyle(RecipeTheme.textPrimary)
+
+                Spacer()
+            }
+
+            HStack(spacing: 12) {
+                Label(viewModel.draft.sourceURL, systemImage: "link")
+                    .font(.system(size: 14, weight: .medium, design: .rounded))
+                    .foregroundStyle(RecipeTheme.textPrimary)
+                    .lineLimit(3)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(Color.white.opacity(0.96))
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(Color.black.opacity(0.06), lineWidth: 1)
+                    .allowsHitTesting(false)
+            }
+            .shadow(color: RecipeTheme.mintShadow.opacity(0.42), radius: 12, y: 6)
+
+            inspectAIButton
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RecipeTheme.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .stroke(RecipeTheme.strokeSoft, lineWidth: 1)
+                .allowsHitTesting(false)
+        }
+        .shadow(color: RecipeTheme.shadow.opacity(0.55), radius: 10, y: 6)
     }
 
     private var generatedPreviewCard: some View {
@@ -140,7 +258,10 @@ struct AddRecipeView: View {
 
                 Spacer()
 
-                PhotosPicker(selection: $selectedPhoto, matching: .images) {
+                Button {
+                    Self.logger.debug("Change Image tapped for source: \(self.viewModel.draft.sourceURL)")
+                    isPresentingImagePicker = true
+                } label: {
                     Label("Change Image", systemImage: "photo")
                         .font(.system(size: 12, weight: .bold, design: .rounded))
                         .foregroundStyle(RecipeTheme.textOnAccent)
@@ -227,6 +348,7 @@ struct AddRecipeView: View {
 
     private var inspectAIButton: some View {
         Button {
+            Self.logger.debug("Inspect AI Input tapped for source: \(self.viewModel.draft.sourceURL)")
             isShowingDebugInspector = true
             Task {
                 await viewModel.loadDebugInfo()
@@ -239,6 +361,7 @@ struct AddRecipeView: View {
                 .padding(.vertical, 9)
                 .background(RecipeTheme.accentStrong)
                 .clipShape(Capsule())
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .disabled(viewModel.isLoadingDebugInfo)

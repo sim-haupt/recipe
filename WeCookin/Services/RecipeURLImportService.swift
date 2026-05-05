@@ -34,10 +34,11 @@ final class RecipeURLImportService: RecipeURLImportServicing {
             throw RecipeURLImportError.invalidURL
         }
 
-        async let linkMetadataTask = fetchLinkMetadata(from: sourceURL)
         async let htmlMetadataTask = fetchHTMLMetadata(from: sourceURL)
+        let shouldLoadLinkMetadata = usesLinkPresentation(for: sourceURL)
+        async let linkMetadataTask: LPLinkMetadata? = shouldLoadLinkMetadata ? (try? fetchLinkMetadata(from: sourceURL)) : nil
 
-        let linkMetadata = try? await linkMetadataTask
+        let linkMetadata = await linkMetadataTask
         let htmlMetadata = try? await htmlMetadataTask
 
         let resolvedURL = htmlMetadata?.canonicalURL ?? linkMetadata?.originalURL ?? linkMetadata?.url ?? sourceURL
@@ -152,6 +153,19 @@ final class RecipeURLImportService: RecipeURLImportServicing {
             .replacingOccurrences(of: "www.", with: "")
             .replacingOccurrences(of: ".", with: " ")
             .capitalized ?? "Imported Recipe")
+    }
+
+    private func usesLinkPresentation(for url: URL) -> Bool {
+        guard let host = url.host?.lowercased() else { return true }
+        let blockedHosts = [
+            "instagram.com",
+            "www.instagram.com",
+            "m.instagram.com",
+            "tiktok.com",
+            "www.tiktok.com",
+            "m.tiktok.com"
+        ]
+        return !blockedHosts.contains(host)
     }
 
     private func firstNonEmpty(_ values: [String?]) -> String? {

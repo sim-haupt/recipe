@@ -10,6 +10,7 @@ final class AddRecipeViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var debugErrorMessage: String?
     @Published var debugInfo: RecipeEnrichmentDebugInfo?
+    @Published var hasResolvedSourcePreview = false
     @Published var selectedImageData: Data?
     @Published private(set) var isUsingCustomImage = false
 
@@ -17,6 +18,7 @@ final class AddRecipeViewModel: ObservableObject {
     private let userProfile: UserProfile
     private var urlImportTask: Task<Void, Never>?
     private var lastImportedURL: String?
+    private var shouldIgnoreNextSourceURLChange = false
     private var importedRawText = ""
     private var importedDescription = ""
     private var lastGeneratedExtraction: RecipeAIExtraction?
@@ -30,7 +32,23 @@ final class AddRecipeViewModel: ObservableObject {
         isUsingCustomImage = data != nil
     }
 
+    func beginEditingSourceURL() {
+        hasResolvedSourcePreview = false
+        debugInfo = nil
+        debugErrorMessage = nil
+    }
+
+    func generatePreviewFromSourceURL() async {
+        urlImportTask?.cancel()
+        await fetchMetadataFromSourceURL(force: true)
+    }
+
     func scheduleURLImport() {
+        if shouldIgnoreNextSourceURLChange {
+            shouldIgnoreNextSourceURLChange = false
+            return
+        }
+
         let trimmedURL = draft.sourceURL.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedURL.isEmpty else {
             urlImportTask?.cancel()
@@ -39,6 +57,7 @@ final class AddRecipeViewModel: ObservableObject {
             lastGeneratedExtraction = nil
             debugInfo = nil
             debugErrorMessage = nil
+            hasResolvedSourcePreview = false
             return
         }
 
@@ -67,19 +86,24 @@ final class AddRecipeViewModel: ObservableObject {
             draft.title = imported.title
             importedRawText = imported.rawText
             importedDescription = imported.description
-            draft.sourceURL = imported.canonicalURL
+            if draft.sourceURL != imported.canonicalURL {
+                shouldIgnoreNextSourceURLChange = true
+                draft.sourceURL = imported.canonicalURL
+            }
             debugInfo = nil
             debugErrorMessage = nil
             if !isUsingCustomImage, let imageData = imported.imageData {
                 selectedImageData = imageData
             }
             lastImportedURL = imported.canonicalURL
+            hasResolvedSourcePreview = true
 
             await generatePreviewContent(
                 importedDescription: imported.description,
                 replaceExistingFields: isNewImport || force
             )
         } catch {
+            hasResolvedSourcePreview = false
             if force {
                 errorMessage = error.localizedDescription
             }

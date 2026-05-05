@@ -1,5 +1,3 @@
-import OpenAI from "openai";
-
 import { recipeExtractionSchema } from "./schema.js";
 
 const DEFAULT_MODEL = process.env.OPENAI_MODEL || "gpt-5.2";
@@ -30,6 +28,24 @@ const SYSTEM_PROMPT = [
 export async function extractRecipeContent(payload) {
   const prepared = await prepareRecipeRequest(payload);
   return extractRecipeContentFromPreparedRequest(prepared);
+}
+
+export function previewPayloadDiagnostics(payload) {
+  const normalizedRequest = normalizePayload(payload);
+  const candidateText = extractCandidateText({
+    ...normalizedRequest,
+    fetchedTitle: "",
+    fetchedDescription: "",
+    fetchedText: ""
+  });
+
+  return {
+    normalizedRequest,
+    candidateText,
+    containsHTML: /<[^>]+>/.test(candidateText),
+    containsIframe: /<iframe/i.test(candidateText),
+    containsScript: /<script/i.test(candidateText)
+  };
 }
 
 export async function debugRecipeContent(payload) {
@@ -79,6 +95,7 @@ async function prepareRecipeRequest(payload) {
 }
 
 async function extractRecipeContentFromPreparedRequest(prepared) {
+  const { default: OpenAI } = await import("openai");
   const client = new OpenAI({ apiKey: prepared.apiKey });
   const response = await client.responses.create({
     model: DEFAULT_MODEL,
@@ -303,6 +320,10 @@ function extractPageText(html) {
 
 function normalizeRecipeCandidateText(value) {
   return decodeEntities(value || "")
+    .replace(/<script[\s\S]*?<\/script>/gi, "\n")
+    .replace(/<iframe[\s\S]*?<\/iframe>/gi, "\n")
+    .replace(/<style[\s\S]*?<\/style>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
     .replace(/�/g, "\n")
     .replace(/\r\n/g, "\n")
     .replace(/\r/g, "\n")

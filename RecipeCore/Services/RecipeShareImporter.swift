@@ -168,10 +168,11 @@ final class RecipeShareImporter {
     }
 
     private func fetchRemoteMetadata(from url: URL) async -> RemoteMetadata? {
-        async let linkMetadataTask = fetchLinkMetadata(from: url)
         async let htmlMetadataTask = fetchHTMLMetadata(from: url)
+        let shouldLoadLinkMetadata = usesLinkPresentation(for: url)
+        async let linkMetadataTask: LPLinkMetadata? = shouldLoadLinkMetadata ? (try? fetchLinkMetadata(from: url)) : nil
 
-        let linkMetadata = try? await linkMetadataTask
+        let linkMetadata = await linkMetadataTask
         let htmlMetadata = try? await htmlMetadataTask
 
         guard linkMetadata != nil || htmlMetadata != nil else {
@@ -315,6 +316,19 @@ final class RecipeShareImporter {
         RecipePageContentExtractor
             .extract(from: html, baseURL: URL(string: "https://example.com")!)
             .bodyText ?? ""
+    }
+
+    private func usesLinkPresentation(for url: URL) -> Bool {
+        guard let host = url.host?.lowercased() else { return true }
+        let blockedHosts = [
+            "instagram.com",
+            "www.instagram.com",
+            "m.instagram.com",
+            "tiktok.com",
+            "www.tiktok.com",
+            "m.tiktok.com"
+        ]
+        return !blockedHosts.contains(host)
     }
 
     private func firstURL(in text: String) -> URL? {
