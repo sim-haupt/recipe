@@ -1,8 +1,10 @@
 import Foundation
+import AuthenticationServices
 
 struct AuthSession: Equatable {
     let userID: String
     let email: String?
+    let displayName: String?
 }
 
 protocol AuthStateListening: AnyObject {
@@ -18,11 +20,14 @@ protocol AuthServicing {
     func observeAuthState(_ handler: @escaping (AuthSession?) -> Void) -> AuthStateListening
     func signIn(email: String, password: String) async throws
     func signUp(name: String, email: String, password: String) async throws -> String
+    func signInWithApple(idToken: String, rawNonce: String, fullName: PersonNameComponents?) async throws
     func signOut() throws
 }
 
 protocol HouseholdServicing {
     func loadUserProfile(userID: String) async throws -> UserProfile?
+    func loadUserProfiles(userIDs: [String]) async throws -> [UserProfile]
+    func loadHousehold(householdID: String) async throws -> Household?
     func createUserProfile(userID: String, name: String, email: String) async throws
     func createHousehold(name: String, owner: UserProfile) async throws -> Household
     func joinHousehold(inviteCode: String, user: UserProfile) async throws -> Household

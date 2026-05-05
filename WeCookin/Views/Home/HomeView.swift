@@ -3,6 +3,7 @@ import SwiftUI
 struct HomeView: View {
     @Environment(\.appEnvironment) private var environment
     @Environment(\.scenePhase) private var scenePhase
+    @EnvironmentObject private var sessionViewModel: SessionViewModel
     @FocusState private var isSearchFocused: Bool
     @StateObject private var viewModel: HomeViewModel
 
@@ -17,6 +18,7 @@ struct HomeView: View {
     @State private var allMinimumRating = 0
     @State private var favoriteMinimumRating = 0
     @State private var isShowingFilterSheet = false
+    @State private var isShowingHouseholdSettings = false
 
     let userProfile: UserProfile
 
@@ -134,6 +136,9 @@ struct HomeView: View {
                                 searchText: currentSearchBinding,
                                 isSearchFocused: $isSearchFocused,
                                 activeFilterCount: currentFilterCount,
+                                householdAction: {
+                                    isShowingHouseholdSettings = true
+                                },
                                 addAction: {
                                     viewModel.isShowingAddRecipe = true
                                 },
@@ -208,6 +213,10 @@ struct HomeView: View {
                     availableCategories: RecipeCategory.allTitles,
                     availableTags: availableTags
                 )
+            }
+            .sheet(isPresented: $isShowingHouseholdSettings) {
+                HouseholdSettingsView(userProfile: userProfile, environment: environment)
+                    .environmentObject(sessionViewModel)
             }
             .task {
                 viewModel.start()
@@ -392,6 +401,7 @@ private struct HomeHeroSection: View {
     @Binding var searchText: String
     @FocusState.Binding var isSearchFocused: Bool
     let activeFilterCount: Int
+    let householdAction: () -> Void
     let addAction: () -> Void
     let filterAction: () -> Void
 
@@ -434,14 +444,17 @@ private struct HomeHeroSection: View {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .center, spacing: 14) {
                     HStack(spacing: 12) {
-                        ZStack {
-                            Circle()
-                                .fill(Color.white.opacity(0.22))
-                            Text(initials)
-                                .font(.system(size: metrics.avatarFontSize, weight: .bold, design: .rounded))
-                                .foregroundStyle(RecipeTheme.textOnAccent)
+                        Button(action: householdAction) {
+                            ZStack {
+                                Circle()
+                                    .fill(Color.white.opacity(0.22))
+                                Text(initials)
+                                    .font(.system(size: metrics.avatarFontSize, weight: .bold, design: .rounded))
+                                    .foregroundStyle(RecipeTheme.textOnAccent)
+                            }
+                            .frame(width: metrics.avatarSize, height: metrics.avatarSize)
                         }
-                        .frame(width: metrics.avatarSize, height: metrics.avatarSize)
+                        .buttonStyle(PressableScaleButtonStyle())
 
                         VStack(alignment: .leading, spacing: 4) {
                             Text(greeting)

@@ -1,4 +1,5 @@
 import Foundation
+import AuthenticationServices
 
 final class DemoAuthService: AuthServicing {
     private let store: DemoDataStore
@@ -11,7 +12,7 @@ final class DemoAuthService: AuthServicing {
     var currentSession: AuthSession? {
         guard let userID = store.currentUserID ?? "demo-user" as String? else { return nil }
         let user = store.users[userID]
-        return AuthSession(userID: userID, email: user?.email)
+        return AuthSession(userID: userID, email: user?.email, displayName: user?.displayName)
     }
 
     func observeAuthState(_ handler: @escaping (AuthSession?) -> Void) -> AuthStateListening {
@@ -54,6 +55,15 @@ final class DemoAuthService: AuthServicing {
         return userID
     }
 
+    func signInWithApple(idToken: String, rawNonce: String, fullName: PersonNameComponents?) async throws {
+        store.seedIfNeeded()
+        if store.currentUserID == nil {
+            store.currentUserID = "demo-user"
+        }
+        store.saveSnapshotIfPossible()
+        store.notifyAuthObservers()
+    }
+
     func signOut() throws {
         store.currentUserID = nil
         store.saveSnapshotIfPossible()
@@ -71,6 +81,15 @@ final class DemoHouseholdService: HouseholdServicing {
 
     func loadUserProfile(userID: String) async throws -> UserProfile? {
         store.users[userID]
+    }
+
+    func loadUserProfiles(userIDs: [String]) async throws -> [UserProfile] {
+        userIDs.compactMap { store.users[$0] }
+            .sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
+    }
+
+    func loadHousehold(householdID: String) async throws -> Household? {
+        store.households[householdID]
     }
 
     func createUserProfile(userID: String, name: String, email: String) async throws {

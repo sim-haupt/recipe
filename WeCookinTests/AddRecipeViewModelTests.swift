@@ -1,5 +1,6 @@
 import XCTest
 @testable import WeCookin
+import AuthenticationServices
 
 @MainActor
 final class AddRecipeViewModelTests: XCTestCase {
@@ -18,7 +19,7 @@ final class AddRecipeViewModelTests: XCTestCase {
             recipeService: MockRecipeService(),
             urlImportService: MockURLImportService(result: importResult),
             recipeEnrichmentService: MockEnrichmentService(
-                extraction: RecipeAIExtraction(summary: "A quick chickpea sandwich.", ingredients: ["1 onion", "2 cans chickpeas", "100g vegan mayo"], confidence: 0.8)
+                extraction: RecipeAIExtraction(title: "Quick Chickpea Sandwich", summary: "A quick chickpea sandwich.", ingredients: ["1 onion", "2 cans chickpeas", "100g vegan mayo"], confidence: 0.8)
             ),
             sharedDraftStore: SharedDraftStore(),
             mode: .demo
@@ -58,6 +59,7 @@ private final class MockAuthService: AuthServicing {
 
     func signIn(email: String, password: String) async throws {}
     func signUp(name: String, email: String, password: String) async throws -> String { "user-1" }
+    func signInWithApple(idToken: String, rawNonce: String, fullName: PersonNameComponents?) async throws {}
     func signOut() throws {}
 }
 
@@ -67,6 +69,8 @@ private final class MockAuthListener: AuthStateListening {
 
 private final class MockHouseholdService: HouseholdServicing {
     func loadUserProfile(userID: String) async throws -> UserProfile? { nil }
+    func loadUserProfiles(userIDs: [String]) async throws -> [UserProfile] { [] }
+    func loadHousehold(householdID: String) async throws -> Household? { nil }
     func createUserProfile(userID: String, name: String, email: String) async throws {}
     func createHousehold(name: String, owner: UserProfile) async throws -> Household {
         Household(id: "house-1", name: name, inviteCode: "invite", memberIDs: [owner.id], createdByUserID: owner.id, createdAt: Date(), updatedAt: Date())

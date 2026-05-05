@@ -147,7 +147,7 @@ final class DemoDataStore {
     func notifyAuthObservers() {
         let session = currentUserID.flatMap { userID in
             let user = users[userID]
-            return AuthSession(userID: userID, email: user?.email)
+            return AuthSession(userID: userID, email: user?.email, displayName: user?.displayName)
         }
         authObservers.values.forEach { $0(session) }
     }

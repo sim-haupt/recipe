@@ -12,6 +12,29 @@ final class FirestoreHouseholdService: HouseholdServicing {
         return mapUserProfile(id: document.documentID, data: data)
     }
 
+    func loadUserProfiles(userIDs: [String]) async throws -> [UserProfile] {
+        try await withThrowingTaskGroup(of: UserProfile?.self) { group in
+            for userID in userIDs {
+                group.addTask {
+                    try await self.loadUserProfile(userID: userID)
+                }
+            }
+
+            var profiles: [UserProfile] = []
+            for try await profile in group {
+                if let profile {
+                    profiles.append(profile)
+                }
+            }
+            return profiles.sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
+        }
+    }
+
+    func loadHousehold(householdID: String) async throws -> Household? {
+        let document = try await database.collection("households").document(householdID).getDocument()
+        return mapHousehold(document)
+    }
+
     func createUserProfile(userID: String, name: String, email: String) async throws {
         let now = Date()
         let payload: [String: Any] = [
