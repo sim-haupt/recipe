@@ -117,11 +117,15 @@ final class FirestoreHouseholdService: HouseholdServicing {
             "updatedAt": Timestamp(date: household.updatedAt)
         ])
 
-        try await database.collection("users").document(owner.id).setData([
-            "activeHouseholdID": householdID,
+        var userPayload: [String: Any] = [
             "householdIDs": FieldValue.arrayUnion([householdID]),
             "updatedAt": Timestamp(date: now)
-        ], merge: true)
+        ]
+        if owner.activeHouseholdID == nil {
+            userPayload["activeHouseholdID"] = householdID
+        }
+
+        try await database.collection("users").document(owner.id).setData(userPayload, merge: true)
 
         return household
     }
@@ -133,7 +137,7 @@ final class FirestoreHouseholdService: HouseholdServicing {
             .getDocuments()
 
         guard let document = snapshot.documents.first, let household = mapHousehold(document) else {
-            throw NSError(domain: "WeCookin", code: 404, userInfo: [NSLocalizedDescriptionKey: "No household matches that invite code."])
+            throw NSError(domain: "WeCookin", code: 404, userInfo: [NSLocalizedDescriptionKey: "No cooking book matches that invite code."])
         }
 
         try await document.reference.setData([
@@ -157,7 +161,7 @@ final class FirestoreHouseholdService: HouseholdServicing {
         ], merge: true)
 
         guard let updated = try await loadUserProfile(userID: userID) else {
-            throw NSError(domain: "WeCookin", code: 500, userInfo: [NSLocalizedDescriptionKey: "Could not reload the updated household selection."])
+            throw NSError(domain: "WeCookin", code: 500, userInfo: [NSLocalizedDescriptionKey: "Could not reload the updated cooking book selection."])
         }
         return updated
     }
@@ -190,7 +194,7 @@ func mapHousehold(_ document: DocumentSnapshot) -> Household? {
     guard let data = document.data() else { return nil }
     return Household(
         id: document.documentID,
-        name: data["name"] as? String ?? "Household",
+        name: data["name"] as? String ?? "Cooking Book",
         inviteCode: data["inviteCode"] as? String ?? "",
         memberIDs: data["memberIDs"] as? [String] ?? [],
         createdByUserID: data["createdByUserID"] as? String ?? "",

@@ -14,7 +14,7 @@ final class HomeViewModel: ObservableObject {
     @Published var isShowingAddRecipe = false
 
     private let environment: AppEnvironment
-    private let userProfile: UserProfile
+    private var userProfile: UserProfile
     private var isImportingPendingDrafts = false
     private var recipeListener: RealtimeListening?
 
@@ -83,6 +83,16 @@ final class HomeViewModel: ObservableObject {
 
         Task {
             await importPendingDraftsIfNeeded()
+        }
+    }
+
+    func updateUserProfile(_ userProfile: UserProfile) {
+        let oldHouseholdID = self.userProfile.activeHouseholdID
+        self.userProfile = userProfile
+
+        if oldHouseholdID != userProfile.activeHouseholdID {
+            recipes = []
+            start()
         }
     }
 

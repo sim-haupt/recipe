@@ -21,8 +21,6 @@ struct HouseholdSettingsView: View {
                     profileCard
                     createHouseholdCard
                     householdListCard
-                    shareCard
-                    membersCard
                     accountCard
                 }
                 .padding(20)
@@ -59,7 +57,7 @@ struct HouseholdSettingsView: View {
     private var profileCard: some View {
         settingsCard(title: "Profile") {
             VStack(alignment: .leading, spacing: 16) {
-                HStack(spacing: 14) {
+                HStack(alignment: .top, spacing: 16) {
                     PhotosPicker(selection: $selectedProfilePhoto, matching: .images) {
                         profileAvatar(size: 76)
                             .overlay(alignment: .bottomTrailing) {
@@ -71,16 +69,23 @@ struct HouseholdSettingsView: View {
                     }
                     .buttonStyle(.plain)
 
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 6) {
                         TextField("Your name", text: $viewModel.editableDisplayName)
-                            .recipeSettingsInputStyle()
+                            .font(.system(size: 17, weight: .bold, design: .rounded))
+                            .foregroundStyle(RecipeTheme.textPrimary)
+                            .textFieldStyle(.plain)
+                            .padding(.horizontal, 2)
 
                         if let email = viewModel.currentUserProfile?.email, !email.isEmpty {
                             Text(email)
                                 .font(.system(size: 13, weight: .medium, design: .rounded))
                                 .foregroundStyle(RecipeTheme.textSecondary)
+                                .padding(.horizontal, 2)
+                                .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, 10)
                 }
 
                 Button {
@@ -108,10 +113,10 @@ struct HouseholdSettingsView: View {
     }
 
     private var createHouseholdCard: some View {
-        settingsCard(title: "Create Household") {
+        settingsCard(title: "Create Cooking Book") {
             VStack(alignment: .leading, spacing: 14) {
-                TextField("Household name", text: $viewModel.newHouseholdName)
-                    .recipeSettingsInputStyle()
+                TextField("Cooking book name", text: $viewModel.newHouseholdName)
+                    .recipeSettingsInputStyle(borderColor: Color.black.opacity(0.10), lineWidth: 1.4)
 
                 Button {
                     Task {
@@ -119,7 +124,7 @@ struct HouseholdSettingsView: View {
                         await sessionViewModel.refreshUserProfile()
                     }
                 } label: {
-                    Text(viewModel.isCreatingHousehold ? "Creating..." : "Create Household")
+                    Text(viewModel.isCreatingHousehold ? "Creating..." : "Create Cooking Book")
                         .font(.system(size: 15, weight: .bold, design: .rounded))
                         .foregroundStyle(RecipeTheme.textOnAccent)
                         .frame(maxWidth: .infinity)
@@ -136,140 +141,85 @@ struct HouseholdSettingsView: View {
     }
 
     private var householdListCard: some View {
-        settingsCard(title: "My Households") {
+        settingsCard(title: "My Cooking Books") {
             VStack(alignment: .leading, spacing: 12) {
                 if viewModel.isLoading {
-                    ProgressView("Loading households…")
+                    ProgressView("Loading cooking books…")
                 } else if viewModel.households.isEmpty {
-                    Text("Create your first household to start sharing recipes.")
+                    Text("Create your first cooking book to start sharing recipes.")
                         .font(.system(size: 14, weight: .medium, design: .rounded))
                         .foregroundStyle(RecipeTheme.textSecondary)
                 } else {
                     ForEach(viewModel.households, id: \.id) { household in
                         let isActive = viewModel.currentUserProfile?.activeHouseholdID == household.id
-                        Button {
-                            Task {
-                                await viewModel.setActiveHousehold(household)
-                                await sessionViewModel.refreshUserProfile()
-                            }
-                        } label: {
+                        VStack(alignment: .leading, spacing: 10) {
                             HStack(spacing: 12) {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(household.name)
-                                        .font(.system(size: 15, weight: .bold, design: .rounded))
-                                        .foregroundStyle(RecipeTheme.textPrimary)
+                                Button {
+                                    Task {
+                                        await viewModel.setActiveHousehold(household)
+                                        await sessionViewModel.refreshUserProfile()
+                                    }
+                                } label: {
+                                    HStack(spacing: 12) {
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text(household.name)
+                                                .font(.system(size: 15, weight: .bold, design: .rounded))
+                                                .foregroundStyle(RecipeTheme.textPrimary)
 
-                                    Text("\(household.memberIDs.count) member\(household.memberIDs.count == 1 ? "" : "s")")
-                                        .font(.system(size: 13, weight: .medium, design: .rounded))
-                                        .foregroundStyle(RecipeTheme.textSecondary)
+                                            Text(isActive ? "Active cooking book" : "Tap to make active")
+                                                .font(.system(size: 13, weight: .medium, design: .rounded))
+                                                .foregroundStyle(isActive ? RecipeTheme.accentStrong : RecipeTheme.textSecondary)
+                                        }
+
+                                        Spacer()
+
+                                        Image(systemName: isActive ? "checkmark.circle.fill" : "circle")
+                                            .font(.system(size: 18, weight: .semibold))
+                                            .foregroundStyle(isActive ? RecipeTheme.accentStrong : RecipeTheme.textSecondary)
+                                    }
                                 }
+                                .buttonStyle(.plain)
+                                .disabled(viewModel.isSwitchingHousehold)
 
-                                Spacer()
+                                Spacer(minLength: 0)
 
-                                Image(systemName: isActive ? "checkmark.circle.fill" : "circle")
-                                    .font(.system(size: 18, weight: .semibold))
-                                    .foregroundStyle(isActive ? RecipeTheme.accentStrong : RecipeTheme.textSecondary)
-                            }
-                            .padding(14)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(
-                                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                    .fill(Color.white.opacity(0.96))
-                            )
-                            .overlay {
-                                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                    .stroke(RecipeTheme.strokeSoft, lineWidth: 1)
-                                    .allowsHitTesting(false)
-                            }
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(viewModel.isSwitchingHousehold)
-                    }
-                }
-            }
-        }
-    }
+                                Button {
+                                    UIPasteboard.general.string = viewModel.shareLink(for: household)
+                                    didCopyLink = true
+                                } label: {
+                                    Image(systemName: "doc.on.doc")
+                                        .font(.system(size: 16, weight: .semibold))
+                                        .foregroundStyle(RecipeTheme.accentStrong)
+                                        .frame(width: 34, height: 34)
+                                        .background(Color.white.opacity(0.92))
+                                        .clipShape(Circle())
+                                }
+                                .buttonStyle(.plain)
 
-    private var shareCard: some View {
-        settingsCard(title: "Share Active Household") {
-            VStack(alignment: .leading, spacing: 14) {
-                Text("Share a link with the people you want to invite. Opening the link will let them join this household in WeCookin'.")
-                    .font(.system(size: 14, weight: .medium, design: .rounded))
-                    .foregroundStyle(RecipeTheme.textSecondary)
-
-                HStack(spacing: 12) {
-                    Button {
-                        UIPasteboard.general.string = viewModel.shareLink
-                        didCopyLink = true
-                    } label: {
-                        Label(didCopyLink ? "Copied" : "Copy Link", systemImage: didCopyLink ? "checkmark.circle.fill" : "doc.on.doc")
-                            .font(.system(size: 14, weight: .bold, design: .rounded))
-                            .foregroundStyle(RecipeTheme.accentStrong)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                            .background(
-                                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                    .fill(Color.white.opacity(0.96))
-                            )
-                            .overlay {
-                                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                    .stroke(RecipeTheme.strokeSoft, lineWidth: 1)
-                                    .allowsHitTesting(false)
-                            }
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(viewModel.activeHousehold == nil)
-
-                    if let inviteURL = URL(string: viewModel.shareLink), viewModel.activeHousehold != nil {
-                        ShareLink(
-                            item: inviteURL,
-                            subject: Text("Join my WeCookin' household"),
-                            message: Text("Join my WeCookin' household \"\(viewModel.activeHouseholdName)\" using this link.")
-                        ) {
-                            Label("Share Link", systemImage: "square.and.arrow.up")
-                                .font(.system(size: 14, weight: .bold, design: .rounded))
-                                .foregroundStyle(RecipeTheme.textOnAccent)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 14)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                        .fill(RecipeTheme.accentStrong)
-                                )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-        }
-    }
-
-    private var membersCard: some View {
-        settingsCard(title: "Active Household Members") {
-            VStack(alignment: .leading, spacing: 12) {
-                if viewModel.isLoading {
-                    ProgressView("Loading members…")
-                } else if viewModel.members.isEmpty {
-                    Text("No members found for the active household yet.")
-                        .font(.system(size: 14, weight: .medium, design: .rounded))
-                        .foregroundStyle(RecipeTheme.textSecondary)
-                } else {
-                    ForEach(viewModel.members, id: \.id) { member in
-                        HStack(spacing: 12) {
-                            memberAvatar(member, size: 42)
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(member.displayName.isEmpty ? "WeCookin User" : member.displayName)
-                                    .font(.system(size: 15, weight: .bold, design: .rounded))
-                                    .foregroundStyle(RecipeTheme.textPrimary)
-
-                                if !member.email.isEmpty {
-                                    Text(member.email)
-                                        .font(.system(size: 13, weight: .medium, design: .rounded))
-                                        .foregroundStyle(RecipeTheme.textSecondary)
+                                if let inviteURL = URL(string: viewModel.shareLink(for: household)) {
+                                    ShareLink(
+                                        item: inviteURL,
+                                        subject: Text("Join my WeCookin' cooking book"),
+                                        message: Text("Join my WeCookin' cooking book \"\(household.name)\" using this link.")
+                                    ) {
+                                        Image(systemName: "square.and.arrow.up")
+                                            .font(.system(size: 16, weight: .semibold))
+                                            .foregroundStyle(RecipeTheme.accentStrong)
+                                            .frame(width: 34, height: 34)
+                                            .background(Color.white.opacity(0.92))
+                                            .clipShape(Circle())
+                                    }
+                                    .buttonStyle(.plain)
                                 }
                             }
 
-                            Spacer()
+                            let householdMembers = viewModel.members(for: household)
+                            if !householdMembers.isEmpty {
+                                Text(householdMembers.map { $0.displayName.isEmpty ? "WeCookin User" : $0.displayName }.joined(separator: ", "))
+                                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                                    .foregroundStyle(RecipeTheme.textSecondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
                         }
                         .padding(14)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -290,19 +240,24 @@ struct HouseholdSettingsView: View {
 
     private var accountCard: some View {
         settingsCard(title: "Account") {
-            Button(role: .destructive) {
+            Button {
                 sessionViewModel.signOut()
                 dismiss()
             } label: {
                 Text("Sign Out")
                     .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(RecipeTheme.accentStrong)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
                     .background(
                         RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .fill(Color.red)
+                            .fill(Color.white.opacity(0.96))
                     )
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .stroke(RecipeTheme.accentStrong, lineWidth: 1.4)
+                            .allowsHitTesting(false)
+                    }
             }
             .buttonStyle(.plain)
         }
@@ -371,7 +326,11 @@ struct HouseholdSettingsView: View {
 }
 
 private extension View {
-    func recipeSettingsInputStyle(minHeight: CGFloat = 56) -> some View {
+    func recipeSettingsInputStyle(
+        minHeight: CGFloat = 56,
+        borderColor: Color = RecipeTheme.strokeSoft,
+        lineWidth: CGFloat = 1
+    ) -> some View {
         self
             .font(.system(size: 16, weight: .medium, design: .rounded))
             .padding(.horizontal, 16)
@@ -383,7 +342,7 @@ private extension View {
             )
             .overlay {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(RecipeTheme.strokeSoft, lineWidth: 1)
+                    .stroke(borderColor, lineWidth: lineWidth)
                     .allowsHitTesting(false)
             }
     }

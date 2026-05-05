@@ -4,7 +4,7 @@ import Foundation
 final class HouseholdSettingsViewModel: ObservableObject {
     @Published private(set) var currentUserProfile: UserProfile?
     @Published private(set) var households: [Household] = []
-    @Published private(set) var members: [UserProfile] = []
+    @Published private(set) var membersByHouseholdID: [String: [UserProfile]] = [:]
     @Published var editableDisplayName: String = ""
     @Published var newHouseholdName: String = ""
     @Published var errorMessage: String?
@@ -32,22 +32,22 @@ final class HouseholdSettingsViewModel: ObservableObject {
         activeHousehold?.name.isEmpty == false ? activeHousehold!.name : "Shared Kitchen"
     }
 
-    var inviteCode: String {
-        activeHousehold?.inviteCode ?? ""
+    func shareLink(for household: Household) -> String {
+        guard !household.inviteCode.isEmpty else { return "wecookin://join" }
+        return "wecookin://join?code=\(household.inviteCode)"
     }
 
-    var shareLink: String {
-        guard !inviteCode.isEmpty else { return "wecookin://join" }
-        return "wecookin://join?code=\(inviteCode)"
-    }
-
-    var inviteMessage: String {
+    func inviteMessage(for household: Household) -> String {
         """
-        Join my WeCookin' household "\(activeHouseholdName)".
+        Join my WeCookin' household "\(household.name)".
 
         Open this link on your iPhone:
-        \(shareLink)
+        \(shareLink(for: household))
         """
+    }
+
+    func members(for household: Household) -> [UserProfile] {
+        membersByHouseholdID[household.id] ?? []
     }
 
     func load() async {
@@ -123,12 +123,11 @@ final class HouseholdSettingsViewModel: ObservableObject {
 
                 households = try await environment.householdService.loadHouseholds(householdIDs: refreshedProfile.householdIDs)
 
-                if let activeHouseholdID = refreshedProfile.activeHouseholdID,
-                   let activeHousehold = households.first(where: { $0.id == activeHouseholdID }) {
-                    members = try await environment.householdService.loadUserProfiles(userIDs: activeHousehold.memberIDs)
-                } else {
-                    members = []
+                var resolvedMembers: [String: [UserProfile]] = [:]
+                for household in households {
+                    resolvedMembers[household.id] = try await environment.householdService.loadUserProfiles(userIDs: household.memberIDs)
                 }
+                membersByHouseholdID = resolvedMembers
             }
         } catch {
             errorMessage = error.localizedDescription

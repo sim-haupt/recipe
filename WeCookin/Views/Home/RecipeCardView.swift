@@ -30,7 +30,8 @@ struct RecipeCardView: View {
                 .stroke(RecipeTheme.strokeSoft, lineWidth: 1)
                 .allowsHitTesting(false)
         }
-        .shadow(color: RecipeTheme.mintShadow, radius: 18, y: 10)
+        .shadow(color: RecipeTheme.mintShadow.opacity(0.95), radius: 18, y: 10)
+        .shadow(color: Color.black.opacity(0.06), radius: 24, y: 14)
         .frame(width: cardWidth)
         .frame(maxWidth: cardWidth == nil ? .infinity : nil, alignment: .topLeading)
     }

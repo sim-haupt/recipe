@@ -12,6 +12,7 @@ struct RecipeDetailView: View {
     @State private var isShowingCommentSheet = false
     @State private var isShowingRatingSheet = false
     @State private var isShowingDeleteConfirmation = false
+    @State private var selectedEditSheetDetent: PresentationDetent = .large
     @State private var selectedCommentPhoto: PhotosPickerItem?
     @State private var commentPhotoData: Data?
     @State private var selectedEditPhoto: PhotosPickerItem?
@@ -47,6 +48,7 @@ struct RecipeDetailView: View {
                 Button {
                     editPhotoData = nil
                     selectedEditPhoto = nil
+                    selectedEditSheetDetent = .large
                     isShowingEditSheet = true
                 } label: {
                     Image(systemName: "pencil")
@@ -70,7 +72,7 @@ struct RecipeDetailView: View {
                             openURL(url)
                         }
                     } label: {
-                        Image(systemName: "safari")
+                        Image(systemName: "link")
                     }
                 }
             }
@@ -250,10 +252,18 @@ struct RecipeDetailView: View {
             }
 
             if let sourceURL = viewModel.recipe.sourceURL, !sourceURL.isEmpty {
-                Label(sourceURL, systemImage: "link")
-                    .font(.system(size: metrics.bodyTextSize - 1, weight: .medium, design: .rounded))
-                    .foregroundStyle(RecipeTheme.textSecondary)
-                    .lineLimit(3)
+                Button {
+                    if let url = URL(string: sourceURL) {
+                        openURL(url)
+                    }
+                } label: {
+                    Label(sourceURL, systemImage: "link")
+                        .font(.system(size: metrics.bodyTextSize - 1, weight: .medium, design: .rounded))
+                        .foregroundStyle(RecipeTheme.textSecondary)
+                        .lineLimit(3)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.plain)
             }
         }
         .padding(metrics.cardPadding)
@@ -442,19 +452,19 @@ struct RecipeDetailView: View {
                     Text("Categories")
                         .font(.system(size: 15, weight: .bold, design: .rounded))
 
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 10)], spacing: 10) {
-                        ForEach(RecipeCategory.allTitles, id: \.self) { category in
-                            let isSelected = viewModel.editableCategories.contains(category)
-                            CategoryPill(title: category, isSelected: isSelected, style: .outlined) {
-                                if isSelected {
-                                    viewModel.editableCategories.remove(category)
-                                } else {
-                                    viewModel.editableCategories.insert(category)
-                                }
+                    FlowCategoryPillList(
+                        titles: RecipeCategory.allTitles,
+                        style: .outlined,
+                        isSelected: { viewModel.editableCategories.contains($0) },
+                        action: { category in
+                            if viewModel.editableCategories.contains(category) {
+                                viewModel.editableCategories.remove(category)
+                            } else {
+                                viewModel.editableCategories.insert(category)
                             }
-                            .frame(maxWidth: .infinity)
                         }
-                    }
+                    )
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
                     Text("Tags")
                         .font(.system(size: 15, weight: .bold, design: .rounded))
@@ -507,7 +517,7 @@ struct RecipeDetailView: View {
                 }
             }
         }
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.medium, .large], selection: $selectedEditSheetDetent)
     }
 
     private var commentSheet: some View {

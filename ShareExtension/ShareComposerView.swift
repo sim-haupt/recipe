@@ -135,35 +135,19 @@ struct ShareComposerView: View {
             }
 
             inputSection(title: "Categories") {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 10)], spacing: 10) {
-                    ForEach(RecipeCategory.allTitles, id: \.self) { category in
-                        let isSelected = viewModel.selectedCategories.contains(category)
-                        Button {
-                            if isSelected {
-                                viewModel.selectedCategories.remove(category)
-                            } else {
-                                viewModel.selectedCategories.insert(category)
-                            }
-                        } label: {
-                            Text(category)
-                                .font(.system(size: 13, weight: .semibold, design: .rounded))
-                                .foregroundStyle(RecipeCategory.color(for: category))
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 10)
-                                .frame(maxWidth: .infinity)
-                                .background(
-                                    Capsule()
-                                        .fill(RecipeCategory.fillColor(for: category, isSelected: isSelected))
-                                )
-                                .overlay {
-                                    Capsule()
-                                        .stroke(RecipeCategory.strokeColor(for: category, isSelected: isSelected), lineWidth: 1)
-                                        .allowsHitTesting(false)
-                                }
+                FlowCategoryPillList(
+                    titles: RecipeCategory.allTitles,
+                    style: .outlined,
+                    isSelected: { viewModel.selectedCategories.contains($0) },
+                    action: { category in
+                        if viewModel.selectedCategories.contains(category) {
+                            viewModel.selectedCategories.remove(category)
+                        } else {
+                            viewModel.selectedCategories.insert(category)
                         }
-                        .buttonStyle(.plain)
                     }
-                }
+                )
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             inputSection(title: "Tags") {
@@ -200,26 +184,10 @@ struct ShareComposerView: View {
         .clipped()
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .overlay(alignment: .bottomLeading) {
-            HStack(spacing: 8) {
-                Text(selectedPhoto != nil ? "Custom image selected" : "Image from share")
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(Color.black.opacity(0.34))
-                    .clipShape(Capsule())
-
-                PhotosPicker(selection: $selectedPhoto, matching: .images) {
-                    Label("Change Image", systemImage: "photo")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(shareAccent)
-                        .clipShape(Capsule())
-                }
-                .buttonStyle(.plain)
+            PhotosPicker(selection: $selectedPhoto, matching: .images) {
+                changeImageLabel
             }
+            .buttonStyle(.plain)
             .padding(12)
         }
     }
@@ -264,6 +232,16 @@ struct ShareComposerView: View {
                 .font(.system(size: 42))
                 .foregroundStyle(.white.opacity(0.9))
         }
+    }
+
+    private var changeImageLabel: some View {
+        Label("Change Image", systemImage: "photo")
+            .font(.system(size: 12, weight: .bold, design: .rounded))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(shareAccent)
+            .clipShape(Capsule())
     }
 }
 

@@ -68,13 +68,13 @@ struct CategoryPill: View {
             )
             .overlay {
                 Capsule()
-                    .stroke(borderColor, lineWidth: isSelected ? 1.2 : 1)
+                    .stroke(borderColor, lineWidth: isSelected ? 2 : 1.6)
                     .allowsHitTesting(false)
             }
             .shadow(
-                color: RecipeCategory.color(for: title).opacity(style == .filled ? (isSelected ? 0.24 : 0.12) : (isSelected ? 0.14 : 0.08)),
-                radius: isSelected ? 10 : 6,
-                y: isSelected ? 5 : 3
+                color: RecipeCategory.color(for: title).opacity(style == .filled ? (isSelected ? 0.24 : 0.12) : (isSelected ? 0.08 : 0.04)),
+                radius: isSelected ? 10 : 4,
+                y: isSelected ? 5 : 2
             )
             .opacity(isSelected ? 1 : 0.94)
     }
@@ -86,7 +86,7 @@ struct CategoryPill: View {
         case .outlined:
             return isSelected
                 ? AnyShapeStyle(RecipeCategory.gradient(for: title))
-                : AnyShapeStyle(Color.white.opacity(0.96))
+                : AnyShapeStyle(RecipeCategory.color(for: title).opacity(0.08))
         }
     }
 
@@ -97,7 +97,7 @@ struct CategoryPill: View {
         case .outlined:
             return isSelected
                 ? Color.clear
-                : RecipeCategory.color(for: title).opacity(0.54)
+                : RecipeCategory.color(for: title).opacity(0.46)
         }
     }
 
@@ -106,7 +106,30 @@ struct CategoryPill: View {
         case .filled:
             return .white
         case .outlined:
-            return isSelected ? .white : RecipeCategory.color(for: title)
+            return isSelected ? .white : RecipeCategory.color(for: title).opacity(0.96)
+        }
+    }
+}
+
+struct FlowCategoryPillList: View {
+    let titles: [String]
+    var compact: Bool = false
+    var style: CategoryPill.Style = .outlined
+    let isSelected: (String) -> Bool
+    let action: (String) -> Void
+
+    var body: some View {
+        FlowWrapLayout(spacing: 10, lineSpacing: 10) {
+            ForEach(titles, id: \.self) { title in
+                CategoryPill(
+                    title: title,
+                    isSelected: isSelected(title),
+                    compact: compact,
+                    style: style
+                ) {
+                    action(title)
+                }
+            }
         }
     }
 }
@@ -181,5 +204,63 @@ struct EditableTagEditor: View {
             tags.append(tag)
         }
         draftTag = ""
+    }
+}
+
+private struct FlowWrapLayout: Layout {
+    var spacing: CGFloat = 8
+    var lineSpacing: CGFloat = 8
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let maxWidth = proposal.width ?? .infinity
+        var currentRowWidth: CGFloat = 0
+        var currentRowHeight: CGFloat = 0
+        var totalHeight: CGFloat = 0
+        var maxRowWidth: CGFloat = 0
+
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            let needsWrap = currentRowWidth > 0 && currentRowWidth + spacing + size.width > maxWidth
+
+            if needsWrap {
+                totalHeight += currentRowHeight + lineSpacing
+                maxRowWidth = max(maxRowWidth, currentRowWidth)
+                currentRowWidth = size.width
+                currentRowHeight = size.height
+            } else {
+                currentRowWidth += currentRowWidth > 0 ? spacing + size.width : size.width
+                currentRowHeight = max(currentRowHeight, size.height)
+            }
+        }
+
+        maxRowWidth = max(maxRowWidth, currentRowWidth)
+        totalHeight += currentRowHeight
+
+        return CGSize(width: maxRowWidth, height: totalHeight)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var x = bounds.minX
+        var y = bounds.minY
+        var rowHeight: CGFloat = 0
+
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            let needsWrap = x > bounds.minX && x + size.width > bounds.maxX
+
+            if needsWrap {
+                x = bounds.minX
+                y += rowHeight + lineSpacing
+                rowHeight = 0
+            }
+
+            subview.place(
+                at: CGPoint(x: x, y: y),
+                proposal: ProposedViewSize(width: size.width, height: size.height)
+            )
+
+            x += size.width + spacing
+            rowHeight = max(rowHeight, size.height)
+        }
     }
 }

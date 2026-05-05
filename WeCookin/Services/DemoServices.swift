@@ -143,7 +143,9 @@ final class DemoHouseholdService: HouseholdServicing {
         store.households[householdID] = household
 
         var updatedUser = owner
-        updatedUser.activeHouseholdID = householdID
+        if updatedUser.activeHouseholdID == nil {
+            updatedUser.activeHouseholdID = householdID
+        }
         updatedUser.householdIDs = Array(Set(updatedUser.householdIDs + [householdID]))
         updatedUser.updatedAt = now
         store.users[owner.id] = updatedUser
@@ -159,7 +161,7 @@ final class DemoHouseholdService: HouseholdServicing {
 
     func joinHousehold(inviteCode: String, user: UserProfile) async throws -> Household {
         guard let household = store.households.values.first(where: { $0.inviteCode.caseInsensitiveCompare(inviteCode) == .orderedSame }) else {
-            throw NSError(domain: "WeCookinDemo", code: 404, userInfo: [NSLocalizedDescriptionKey: "No demo household matches that invite code."])
+            throw NSError(domain: "WeCookinDemo", code: 404, userInfo: [NSLocalizedDescriptionKey: "No demo cooking book matches that invite code."])
         }
 
         var updatedHousehold = household

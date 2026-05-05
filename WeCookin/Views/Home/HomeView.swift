@@ -27,6 +27,10 @@ struct HomeView: View {
         _viewModel = StateObject(wrappedValue: HomeViewModel(environment: environment, userProfile: userProfile))
     }
 
+    private var effectiveUserProfile: UserProfile {
+        sessionViewModel.userProfile ?? userProfile
+    }
+
     private var baseRecipes: [Recipe] {
         selectedTab == .all ? viewModel.allRecipesSorted : viewModel.favoriteRecipes
     }
@@ -131,7 +135,7 @@ struct HomeView: View {
                             HomeHeroSection(
                                 metrics: metrics,
                                 initials: userInitials,
-                                profileImageURL: userProfile.profileImageURL,
+                                profileImageURL: effectiveUserProfile.profileImageURL,
                                 greeting: "Hello, \(firstName)",
                                 subtitle: "What we cookin’?",
                                 searchText: currentSearchBinding,
@@ -204,7 +208,7 @@ struct HomeView: View {
             .background(RecipeTheme.homeBackdrop.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $viewModel.isShowingAddRecipe) {
-                AddRecipeView(userProfile: userProfile, environment: environment)
+                AddRecipeView(userProfile: effectiveUserProfile, environment: environment)
             }
             .sheet(isPresented: $isShowingFilterSheet) {
                 RecipeFilterSheet(
@@ -216,11 +220,14 @@ struct HomeView: View {
                 )
             }
             .sheet(isPresented: $isShowingHouseholdSettings) {
-                HouseholdSettingsView(userProfile: sessionViewModel.userProfile ?? userProfile, environment: environment)
+                HouseholdSettingsView(userProfile: effectiveUserProfile, environment: environment)
                     .environmentObject(sessionViewModel)
             }
             .task {
                 viewModel.start()
+            }
+            .onChange(of: effectiveUserProfile) { _, newValue in
+                viewModel.updateUserProfile(newValue)
             }
             .onChange(of: scenePhase) { _, newPhase in
                 guard newPhase == .active else { return }
@@ -299,7 +306,7 @@ struct HomeView: View {
             LazyVStack(spacing: feedStyle == .cards ? 18 : 14) {
                 ForEach(displayedRecipes) { recipe in
                     NavigationLink {
-                        RecipeDetailView(recipe: recipe, userProfile: userProfile, environment: environment)
+                        RecipeDetailView(recipe: recipe, userProfile: effectiveUserProfile, environment: environment)
                     } label: {
                         RecipeCardView(
                             recipe: recipe,
@@ -327,14 +334,14 @@ struct HomeView: View {
     }
 
     private var firstName: String {
-        userProfile.displayName
+        effectiveUserProfile.displayName
             .split(separator: " ")
             .first
-            .map(String.init) ?? userProfile.displayName
+            .map(String.init) ?? effectiveUserProfile.displayName
     }
 
     private var userInitials: String {
-        let pieces = userProfile.displayName.split(separator: " ")
+        let pieces = effectiveUserProfile.displayName.split(separator: " ")
         let firstTwo = pieces.prefix(2).compactMap { $0.first }
         let initials = String(firstTwo)
         return initials.isEmpty ? "CB" : initials
@@ -620,7 +627,8 @@ private struct RecipeTabButton: View {
                     .stroke(isSelected ? Color.clear : RecipeTheme.strokeSoft, lineWidth: 1)
                     .allowsHitTesting(false)
             }
-            .shadow(color: isSelected ? RecipeTheme.mintShadow : RecipeTheme.shadow.opacity(0.05), radius: 12, y: 6)
+            .shadow(color: isSelected ? RecipeTheme.mintShadow.opacity(0.95) : RecipeTheme.shadow.opacity(0.08), radius: 14, y: 7)
+            .shadow(color: Color.black.opacity(isSelected ? 0.06 : 0.04), radius: 20, y: 10)
         }
         .buttonStyle(PressableScaleButtonStyle())
         .contentShape(Rectangle())
@@ -774,7 +782,7 @@ private struct RecipeFilterSheet: View {
                         Text("Minimum Rating")
                             .font(.system(size: 17, weight: .bold, design: .rounded))
 
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 88), spacing: 10)], alignment: .leading, spacing: 10) {
+                        HStack(spacing: 10) {
                             ratingChip(value: 0, label: "Any")
                             ratingChip(value: 3, label: "3+")
                             ratingChip(value: 4, label: "4+")
@@ -793,7 +801,9 @@ private struct RecipeFilterSheet: View {
                         }
                     }
                 }
-                .padding(20)
+                .padding(.horizontal, 20)
+                .padding(.top, 10)
+                .padding(.bottom, 20)
             }
             .background(RecipeTheme.homeBackdrop.ignoresSafeArea())
             .toolbar {
@@ -856,21 +866,19 @@ private struct AdaptiveCategoryGrid: View {
     @Binding var selectedTags: Set<String>
 
     var body: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 132), spacing: 10)], alignment: .leading, spacing: 10) {
-            ForEach(tags, id: \.self) { tag in
-                CategoryBadge(
-                    title: tag,
-                    isSelected: selectedTags.contains(tag),
-                    action: {
-                        if selectedTags.contains(tag) {
-                            selectedTags.remove(tag)
-                        } else {
-                            selectedTags.insert(tag)
-                        }
-                    }
-                )
+        FlowCategoryPillList(
+            titles: tags,
+            style: .outlined,
+            isSelected: { selectedTags.contains($0) },
+            action: { tag in
+                if selectedTags.contains(tag) {
+                    selectedTags.remove(tag)
+                } else {
+                    selectedTags.insert(tag)
+                }
             }
-        }
+        )
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

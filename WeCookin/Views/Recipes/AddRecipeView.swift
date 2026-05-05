@@ -111,8 +111,8 @@ struct AddRecipeView: View {
                             Image(systemName: "sparkles")
                         }
                         Text(viewModel.isGeneratingPreview
-                             ? "Generating editable recipe preview…"
-                             : (viewModel.isImportingURL ? "Fetching recipe preview…" : "Generate Preview"))
+                             ? "Importing recipe…"
+                             : (viewModel.isImportingURL ? "Fetching recipe…" : "Import Recipe"))
                     }
                     .font(.system(size: 14, weight: .bold, design: .rounded))
                     .foregroundStyle(RecipeTheme.textOnAccent)
@@ -243,8 +243,6 @@ private struct AddRecipePreviewEditorView: View {
                     .allowsHitTesting(false)
             }
             .shadow(color: RecipeTheme.mintShadow.opacity(0.42), radius: 12, y: 6)
-
-            inspectAIButton
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -360,31 +358,15 @@ private struct AddRecipePreviewEditorView: View {
         .clipped()
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .overlay(alignment: .bottomLeading) {
-            HStack(spacing: 8) {
-                Text(viewModel.isUsingCustomImage ? "Custom image selected" : "Image from metadata")
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(Color.black.opacity(0.34))
-                    .clipShape(Capsule())
-
-                Button {
-                    Self.logger.debug("Change Image tapped for source: \(self.viewModel.draft.sourceURL)")
-                    self.viewModel.logPreviewDiagnostics(context: "ChangeImage.tap")
-                    isPresentingImagePicker = true
-                } label: {
-                    Label("Change Image", systemImage: "photo")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(RecipeTheme.textOnAccent)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(RecipeTheme.accentStrong)
-                        .clipShape(Capsule())
-                }
-                .buttonStyle(.plain)
-                .modifier(FrameLoggingModifier(name: "changeImageButton", logger: Self.logger))
+            Button {
+                Self.logger.debug("Change Image tapped for source: \(self.viewModel.draft.sourceURL)")
+                self.viewModel.logPreviewDiagnostics(context: "ChangeImage.tap")
+                isPresentingImagePicker = true
+            } label: {
+                changeImageLabel
             }
+            .buttonStyle(.plain)
+            .modifier(FrameLoggingModifier(name: "changeImageButton", logger: Self.logger))
             .padding(12)
         }
         .modifier(FrameLoggingModifier(name: "previewImage", logger: Self.logger))
@@ -426,6 +408,16 @@ private struct AddRecipePreviewEditorView: View {
         .buttonStyle(.plain)
         .disabled(viewModel.isLoadingDebugInfo)
         .modifier(FrameLoggingModifier(name: "inspectAIButton", logger: Self.logger))
+    }
+
+    private var changeImageLabel: some View {
+        Label("Change Image", systemImage: "photo")
+            .font(.system(size: 12, weight: .bold, design: .rounded))
+            .foregroundStyle(RecipeTheme.textOnAccent)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(RecipeTheme.accentStrong)
+            .clipShape(Capsule())
     }
 
     private var debugInspectorSheet: some View {
@@ -632,19 +624,19 @@ private struct CategorySelectionGrid: View {
                 .font(.system(size: 14, weight: .medium, design: .rounded))
                 .foregroundStyle(.secondary)
 
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 10)], spacing: 10) {
-                ForEach(RecipeCategory.allTitles, id: \.self) { category in
-                    let isSelected = selectedCategories.contains(category)
-                    CategoryPill(title: category, isSelected: isSelected, style: .outlined) {
-                        if isSelected {
-                            selectedCategories.removeAll { $0 == category }
-                        } else {
-                            selectedCategories.append(category)
-                        }
+            FlowCategoryPillList(
+                titles: RecipeCategory.allTitles,
+                style: .outlined,
+                isSelected: { selectedCategories.contains($0) },
+                action: { category in
+                    if selectedCategories.contains(category) {
+                        selectedCategories.removeAll { $0 == category }
+                    } else {
+                        selectedCategories.append(category)
                     }
-                    .frame(maxWidth: .infinity)
                 }
-            }
+            )
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 }
