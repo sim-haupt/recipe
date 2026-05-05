@@ -22,7 +22,6 @@ enum RecipeEnrichmentError: LocalizedError {
 final class RecipeEnrichmentService: RecipeEnrichmentServicing {
     private let session: URLSession
     private let endpointURL: URL?
-    private let fallback = HeuristicRecipeEnrichmentService()
 
     init(session: URLSession = .shared, endpointURL: URL? = RecipeEnrichmentService.configuredEndpointURL()) {
         self.session = session
@@ -31,27 +30,14 @@ final class RecipeEnrichmentService: RecipeEnrichmentServicing {
 
     func enrichRecipeContent(using request: RecipeEnrichmentRequest) async throws -> RecipeAIExtraction? {
         guard request.hasEnoughContent else { return nil }
-
-        if let endpointURL {
-            do {
-                return try await fetchBackendExtraction(request: request, endpointURL: endpointURL)
-            } catch {
-                let fallbackExtraction = fallback.enrichRecipeContent(using: request)
-                if fallbackExtraction.hasMeaningfulContent {
-                    return fallbackExtraction
-                }
-                throw error
-            }
-        }
-
-        let fallbackExtraction = fallback.enrichRecipeContent(using: request)
-        return fallbackExtraction.hasMeaningfulContent ? fallbackExtraction : nil
+        guard let endpointURL else { throw RecipeEnrichmentError.backendUnavailable }
+        return try await fetchBackendExtraction(request: request, endpointURL: endpointURL)
     }
 
     func debugRecipeContent(using request: RecipeEnrichmentRequest) async throws -> RecipeEnrichmentDebugInfo? {
         guard request.hasEnoughContent else { return nil }
         guard let debugEndpointURL = debugEndpointURL() else {
-            return RecipeEnrichmentDebugInfo.localFallback(from: request)
+            return RecipeEnrichmentDebugInfo.localInputOnly(from: request)
         }
 
         var urlRequest = URLRequest(url: debugEndpointURL)
@@ -84,47 +70,11 @@ final class RecipeEnrichmentService: RecipeEnrichmentServicing {
         }
 
         let decoded = try JSONDecoder().decode(BackendRecipeEnrichmentResponse.self, from: data)
-        let extraction = mergedExtraction(primary: decoded.asExtraction, fallback: fallback.enrichRecipeContent(using: request))
+        let extraction = decoded.asExtraction
         guard extraction.hasMeaningfulContent else {
             throw RecipeEnrichmentError.invalidResponse
         }
         return extraction
-    }
-
-    private func mergedExtraction(primary: RecipeAIExtraction, fallback: RecipeAIExtraction) -> RecipeAIExtraction {
-        RecipeAIExtraction(
-            title: primary.title.isEmpty ? fallback.title : primary.title,
-            summary: primary.summary.isEmpty ? fallback.summary : primary.summary,
-            ingredients: shouldPreferFallbackIngredients(primary.ingredients, fallback: fallback.ingredients) ? fallback.ingredients : primary.ingredients,
-            confidence: primary.confidence ?? fallback.confidence
-        )
-    }
-
-    private func shouldPreferFallbackIngredients(_ primary: [String], fallback: [String]) -> Bool {
-        if primary.isEmpty {
-            return !fallback.isEmpty
-        }
-
-        if primary.count <= 2 && fallback.count >= 4 {
-            return true
-        }
-
-        return primary.contains(where: isSuspiciousRecipeBlob)
-    }
-    private func isSuspiciousRecipeBlob(_ value: String) -> Bool {
-        let lowercased = value.lowercased()
-        if lowercased.contains("recipe (") || lowercased.contains("rezept (") {
-            return true
-        }
-        if lowercased.contains("likes") || lowercased.contains("comments") {
-            return true
-        }
-        if value.count > 260 {
-            return true
-        }
-
-        let dashedSegments = value.components(separatedBy: "-").count - 1
-        return dashedSegments >= 3
     }
 
     private static func configuredEndpointURL() -> URL? {
@@ -157,17 +107,12 @@ struct RecipeEnrichmentDebugInfo: Decodable {
     let candidateText: String
     let extraction: RecipeAIExtraction
 
-    static func localFallback(from request: RecipeEnrichmentRequest) -> RecipeEnrichmentDebugInfo {
+    static func localInputOnly(from request: RecipeEnrichmentRequest) -> RecipeEnrichmentDebugInfo {
         let normalizedRawText = ImportedTextSanitizer.normalizedRecipeExtractionText(from: request.rawText)
-        let summary = ImportedTextSanitizer.preferredRecipeDescription(
-            baseDescription: request.description,
-            rawText: request.rawText,
-            aiSummary: nil
-        )
 
         return RecipeEnrichmentDebugInfo(
-            model: "local-heuristic-fallback",
-            systemPrompt: "Backend debug endpoint is unavailable. This is local app-side input only.",
+            model: "debug-input-only",
+            systemPrompt: "Backend debug endpoint is unavailable. This inspector is showing only the app-side input that would be sent to the backend.",
             userPrompt: "",
             sourceURL: request.sourceURL,
             title: request.title,
@@ -177,109 +122,8 @@ struct RecipeEnrichmentDebugInfo: Decodable {
             fetchedDescription: "",
             fetchedText: "",
             candidateText: normalizedRawText,
-            extraction: RecipeAIExtraction(title: "", summary: summary, ingredients: [], confidence: nil)
+            extraction: .empty
         )
-    }
-}
-
-private final class HeuristicRecipeEnrichmentService {
-    func enrichRecipeContent(using request: RecipeEnrichmentRequest) -> RecipeAIExtraction {
-        let summary = ImportedTextSanitizer.preferredRecipeDescription(
-            baseDescription: request.description,
-            rawText: request.rawText,
-            aiSummary: nil
-        )
-        let normalizedRecipeText = ImportedTextSanitizer.normalizedRecipeExtractionText(from: request.rawText)
-        let rawLines = normalizedRecipeText
-            .components(separatedBy: .newlines)
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-
-        let ingredients = extractIngredients(from: rawLines)
-        let title = generateTitle(from: request, lines: rawLines)
-
-        return RecipeAIExtraction(
-            title: title,
-            summary: summary,
-            ingredients: ingredients,
-            confidence: inferredConfidence(summary: summary, ingredients: ingredients)
-        )
-    }
-
-    private func generateTitle(from request: RecipeEnrichmentRequest, lines: [String]) -> String {
-        let existingTitle = ImportedTextSanitizer.cleanInline(request.title)
-        if !ImportedTextSanitizer.isLikelyNoisySocialTitle(existingTitle, sourceURL: request.sourceURL, rawText: request.rawText) {
-            return existingTitle
-        }
-
-        let titleLine = lines
-            .map { ImportedTextSanitizer.cleanInline($0) }
-            .first { line in
-                !line.isEmpty
-                    && line.count <= 80
-                    && !line.localizedCaseInsensitiveContains("likes")
-                    && !line.localizedCaseInsensitiveContains("comments")
-                    && !line.contains("@")
-            }
-
-        return titleLine ?? ""
-    }
-
-    private func extractIngredients(from lines: [String]) -> [String] {
-        sectionLines(
-            from: lines,
-            matchingHeaders: ["ingredients", "ingredient list", "what you need"],
-            untilHeaders: ["instructions", "directions", "method", "preparation", "steps", "how to make"]
-        ) ?? lines
-            .filter { looksLikeIngredient($0) }
-            .prefix(18)
-            .map { normalizeListLine($0) }
-    }
-
-    private func sectionLines(from lines: [String], matchingHeaders headers: [String], untilHeaders endHeaders: [String]) -> [String]? {
-        guard let startIndex = lines.firstIndex(where: { line in
-            let normalized = line.lowercased()
-            return headers.contains(where: { normalized.contains($0) })
-        }) else {
-            return nil
-        }
-
-        let remaining = lines.dropFirst(startIndex + 1)
-        let endIndex = remaining.firstIndex(where: { line in
-            let normalized = line.lowercased()
-            return endHeaders.contains(where: { normalized.contains($0) })
-        })
-
-        let slice = endIndex.map { remaining[..<$0] } ?? remaining[remaining.startIndex...]
-        let cleaned = slice
-            .map { normalizeListLine($0) }
-            .filter { !$0.isEmpty }
-
-        return cleaned.isEmpty ? nil : Array(cleaned.prefix(20))
-    }
-
-    private func looksLikeIngredient(_ line: String) -> Bool {
-        let lowercased = line.lowercased()
-        if lowercased.count > 90 { return false }
-        if lowercased.contains("http") { return false }
-        return lowercased.range(of: #"^(\d+|\d+/\d+|[\-\u2022])\s"#, options: .regularExpression) != nil
-            || lowercased.range(of: #"\b(cup|cups|tbsp|tsp|teaspoon|teaspoons|tablespoon|tablespoons|g|kg|oz|lb|ml|l|pinch|clove|cloves|slice|slices)\b"#, options: .regularExpression) != nil
-    }
-
-    private func normalizeListLine(_ line: String) -> String {
-        line
-            .replacingOccurrences(of: #"^(\d+[\.\)]\s*|[\-\u2022]\s*|step\s+\d+\s*[:\-]?\s*)"#, with: "", options: .regularExpression)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private func inferredConfidence(summary: String, ingredients: [String]) -> Double? {
-        if !ingredients.isEmpty {
-            return 0.56
-        }
-        if !summary.isEmpty && !ingredients.isEmpty {
-            return 0.42
-        }
-        return nil
     }
 }
 

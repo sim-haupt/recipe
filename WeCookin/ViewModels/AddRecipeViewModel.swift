@@ -203,7 +203,7 @@ final class AddRecipeViewModel: ObservableObject {
         lastGeneratedExtraction = enrichment
 
         if shouldReplaceTitleWithAI(enrichment?.title) {
-            draft.title = enrichment?.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? draft.title
+            draft.title = enrichment?.title.trimmingCharacters(in: .whitespacesAndNewlines) ?? draft.title
         }
 
         draft.description = ImportedTextSanitizer.preferredRecipeDescription(
@@ -247,7 +247,7 @@ final class AddRecipeViewModel: ObservableObject {
             rawText: importedRawText
         ) ? "" : draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        RecipeEnrichmentRequest(
+        return RecipeEnrichmentRequest(
             sourceURL: draft.sourceURL.trimmingCharacters(in: .whitespacesAndNewlines),
             title: titleForEnrichment,
             description: draft.description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty

@@ -49,7 +49,7 @@ final class ShareViewModel: ObservableObject {
 
         lastGeneratedExtraction = enrichment
         if shouldReplaceTitleWithAI(enrichment?.title) {
-            title = enrichment?.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? title
+            title = enrichment?.title.trimmingCharacters(in: .whitespacesAndNewlines) ?? title
         }
         description = ImportedTextSanitizer.preferredRecipeDescription(
             baseDescription: description,
