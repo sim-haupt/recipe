@@ -135,9 +135,8 @@ struct ShareComposerView: View {
             }
 
             inputSection(title: "Categories") {
-                FlowCategoryPillList(
+                ShareFlowCategoryPillList(
                     titles: RecipeCategory.allTitles,
-                    style: .outlined,
                     isSelected: { viewModel.selectedCategories.contains($0) },
                     action: { category in
                         if viewModel.selectedCategories.contains(category) {
@@ -163,7 +162,7 @@ struct ShareComposerView: View {
                 .stroke(Color.black.opacity(0.05), lineWidth: 1)
                 .allowsHitTesting(false)
         }
-        .shadow(color: Color.black.opacity(0.08), radius: 10, y: 6)
+        .shadow(color: previewCardShadowColor, radius: 10, y: 6)
     }
 
     @ViewBuilder
@@ -217,6 +216,10 @@ struct ShareComposerView: View {
         Color(red: 74 / 255, green: 194 / 255, blue: 116 / 255)
     }
 
+    private var previewCardShadowColor: Color {
+        Color.black.opacity(0.08)
+    }
+
     private var sharePlaceholder: some View {
         ZStack {
             LinearGradient(
@@ -242,6 +245,112 @@ struct ShareComposerView: View {
             .padding(.vertical, 8)
             .background(shareAccent)
             .clipShape(Capsule())
+    }
+}
+
+private struct ShareFlowCategoryPillList: View {
+    let titles: [String]
+    let isSelected: (String) -> Bool
+    let action: (String) -> Void
+
+    var body: some View {
+        ShareFlowWrapLayout(spacing: 10, lineSpacing: 10) {
+            ForEach(titles, id: \.self) { title in
+                ShareCategoryPill(title: title, isSelected: isSelected(title)) {
+                    action(title)
+                }
+            }
+        }
+    }
+}
+
+private struct ShareCategoryPill: View {
+    let title: String
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .foregroundStyle(isSelected ? .white : RecipeCategory.color(for: title).opacity(0.96))
+                .padding(.horizontal, 14)
+                .padding(.vertical, 9)
+                .background(
+                    Capsule()
+                        .fill(isSelected ? AnyShapeStyle(RecipeCategory.gradient(for: title)) : AnyShapeStyle(RecipeCategory.color(for: title).opacity(0.08)))
+                )
+                .overlay {
+                    Capsule()
+                        .stroke(isSelected ? Color.clear : RecipeCategory.color(for: title).opacity(0.46), lineWidth: isSelected ? 2 : 1.6)
+                        .allowsHitTesting(false)
+                }
+                .shadow(
+                    color: RecipeCategory.color(for: title).opacity(isSelected ? 0.08 : 0.04),
+                    radius: isSelected ? 10 : 4,
+                    y: isSelected ? 5 : 2
+                )
+                .opacity(isSelected ? 1 : 0.94)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct ShareFlowWrapLayout: Layout {
+    var spacing: CGFloat = 8
+    var lineSpacing: CGFloat = 8
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let maxWidth = proposal.width ?? .infinity
+        var currentRowWidth: CGFloat = 0
+        var currentRowHeight: CGFloat = 0
+        var totalHeight: CGFloat = 0
+        var maxRowWidth: CGFloat = 0
+
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            let needsWrap = currentRowWidth > 0 && currentRowWidth + spacing + size.width > maxWidth
+
+            if needsWrap {
+                totalHeight += currentRowHeight + lineSpacing
+                maxRowWidth = max(maxRowWidth, currentRowWidth)
+                currentRowWidth = size.width
+                currentRowHeight = size.height
+            } else {
+                currentRowWidth += currentRowWidth > 0 ? spacing + size.width : size.width
+                currentRowHeight = max(currentRowHeight, size.height)
+            }
+        }
+
+        maxRowWidth = max(maxRowWidth, currentRowWidth)
+        totalHeight += currentRowHeight
+
+        return CGSize(width: maxRowWidth, height: totalHeight)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var x = bounds.minX
+        var y = bounds.minY
+        var rowHeight: CGFloat = 0
+
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            let needsWrap = x > bounds.minX && x + size.width > bounds.maxX
+
+            if needsWrap {
+                x = bounds.minX
+                y += rowHeight + lineSpacing
+                rowHeight = 0
+            }
+
+            subview.place(
+                at: CGPoint(x: x, y: y),
+                proposal: ProposedViewSize(width: size.width, height: size.height)
+            )
+
+            x += size.width + spacing
+            rowHeight = max(rowHeight, size.height)
+        }
     }
 }
 
