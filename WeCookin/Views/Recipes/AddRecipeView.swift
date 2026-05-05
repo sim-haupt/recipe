@@ -297,8 +297,17 @@ private struct AddRecipePreviewEditorView: View {
             }
 
             inputSection(title: "Ingredients") {
-                TextField("One ingredient per line", text: $viewModel.draft.ingredientsText, axis: .vertical)
-                    .recipeFormInputStyle(minHeight: 150)
+                VStack(alignment: .leading, spacing: 12) {
+                    TextField("One ingredient per line", text: $viewModel.draft.ingredientsText, axis: .vertical)
+                        .recipeFormInputStyle(minHeight: 150)
+
+                    FormattedIngredientsPreviewCard(
+                        items: IngredientFormatting.lines(from: viewModel.draft.ingredientsText),
+                        accent: RecipeTheme.accentStrong,
+                        textPrimary: RecipeTheme.textPrimary,
+                        surface: Color.white.opacity(0.9)
+                    )
+                }
             }
 
             inputSection(title: "Categories") {
@@ -477,6 +486,61 @@ private struct AddRecipePreviewEditorView: View {
                         .stroke(Color.black.opacity(0.06), lineWidth: 1)
                         .allowsHitTesting(false)
                 }
+        }
+    }
+}
+
+private struct FormattedIngredientsPreviewCard: View {
+    let items: [String]
+    let accent: Color
+    let textPrimary: Color
+    let surface: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Saved format preview")
+                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .foregroundStyle(.secondary)
+
+            if items.isEmpty {
+                Text("Ingredients will appear here once extracted or edited.")
+                    .font(.system(size: 14, weight: .medium, design: .rounded))
+                    .foregroundStyle(.secondary)
+            } else {
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(Array(items.enumerated()), id: \.offset) { index, item in
+                        if IngredientFormatting.isSectionHeader(item) {
+                            Text(item)
+                                .font(.system(size: 15, weight: .bold, design: .rounded))
+                                .foregroundStyle(accent)
+                                .padding(.top, index == 0 ? 0 : 6)
+                        } else {
+                            HStack(alignment: .top, spacing: 10) {
+                                Text("•")
+                                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                                    .foregroundStyle(accent)
+                                    .frame(width: 10, alignment: .leading)
+
+                                Text(item)
+                                    .font(.system(size: 15, weight: .medium, design: .rounded))
+                                    .foregroundStyle(textPrimary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(surface)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color.black.opacity(0.05), lineWidth: 1)
+                .allowsHitTesting(false)
         }
     }
 }

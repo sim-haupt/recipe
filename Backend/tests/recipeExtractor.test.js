@@ -90,3 +90,25 @@ test("candidate text preserves grouped ingredient subsection markers", () => {
   assert.match(diagnostics.candidateText, /Sauce:/);
   assert.match(diagnostics.candidateText, /To serve:/);
 });
+
+test("narrative recipe text keeps distinct component cues for gpt inference", () => {
+  const diagnostics = previewPayloadDiagnostics({
+    sourceURL: "https://www.instagram.com/reel/narrative-example/",
+    title: "",
+    description: "",
+    rawText: [
+      "The chicken is ridiculously good in this recipe, but honestly? The veggies might be the best part.",
+      "Add 4 chicken leg quarters (or 2lbs thighs) to a large bowl. Drizzle with 1 tbsp olive oil, add the zest + juice of a large lemon, 1 tbsp garlic powder, 1 tbsp oregano, 1/2 tsp cayenne pepper, 1.5 tbsp paprika, and a generous pinch of salt and pepper. I also add 2 tbsp tomato paste & 4 minced garlic cloves.",
+      "I used 2 medium sweet potato, a large handful broccoli florets, and a large shallot (or red onion).",
+      "Drizzle with olive oil, season with salt, 1/2 tbsp oregano, & 1/2 tbsp garlic powder.",
+      "For your creamy lemony zesty sauce, mix 3 tbsp mayo with 1 tbsp tomato paste, 1 minced garlic clove, the zest and juice of 1 lemon, and a pinch of salt.",
+      "Plate up your chicken with veggies, top with finely chopped fresh parsley, a little sauce, and serve with regular rice, quinoa, or protein rice if you like."
+    ].join("\n")
+  });
+
+  assert.match(diagnostics.candidateText, /chicken leg quarters/i);
+  assert.match(diagnostics.candidateText, /sweet potato/i);
+  assert.match(diagnostics.candidateText, /creamy lemony zesty sauce/i);
+  assert.match(diagnostics.candidateText, /mayo/i);
+  assert.match(diagnostics.candidateText, /regular rice/i);
+});

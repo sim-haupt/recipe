@@ -111,8 +111,15 @@ struct ShareComposerView: View {
             }
 
             inputSection(title: "Ingredients") {
-                TextField("One ingredient per line", text: $viewModel.ingredientsText, axis: .vertical)
-                    .shareInputFieldStyle(minHeight: 150)
+                VStack(alignment: .leading, spacing: 12) {
+                    TextField("One ingredient per line", text: $viewModel.ingredientsText, axis: .vertical)
+                        .shareInputFieldStyle(minHeight: 150)
+
+                    ShareFormattedIngredientsPreviewCard(
+                        items: IngredientFormatting.lines(from: viewModel.ingredientsText),
+                        accent: shareAccent
+                    )
+                }
             }
 
             inputSection(title: "Categories") {
@@ -221,6 +228,59 @@ struct ShareComposerView: View {
             Image(systemName: "fork.knife.circle.fill")
                 .font(.system(size: 42))
                 .foregroundStyle(.white.opacity(0.9))
+        }
+    }
+}
+
+private struct ShareFormattedIngredientsPreviewCard: View {
+    let items: [String]
+    let accent: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Saved format preview")
+                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .foregroundStyle(.secondary)
+
+            if items.isEmpty {
+                Text("Ingredients will appear here once extracted or edited.")
+                    .font(.system(size: 14, weight: .medium, design: .rounded))
+                    .foregroundStyle(.secondary)
+            } else {
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(Array(items.enumerated()), id: \.offset) { index, item in
+                        if IngredientFormatting.isSectionHeader(item) {
+                            Text(item)
+                                .font(.system(size: 15, weight: .bold, design: .rounded))
+                                .foregroundStyle(accent)
+                                .padding(.top, index == 0 ? 0 : 6)
+                        } else {
+                            HStack(alignment: .top, spacing: 10) {
+                                Text("•")
+                                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                                    .foregroundStyle(accent)
+                                    .frame(width: 10, alignment: .leading)
+
+                                Text(item)
+                                    .font(.system(size: 15, weight: .medium, design: .rounded))
+                                    .foregroundStyle(.primary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color.white.opacity(0.94))
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color.black.opacity(0.05), lineWidth: 1)
+                .allowsHitTesting(false)
         }
     }
 }

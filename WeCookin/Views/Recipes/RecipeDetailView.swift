@@ -252,7 +252,7 @@ struct RecipeDetailView: View {
                 .foregroundStyle(RecipeTheme.textPrimary)
 
             ForEach(Array(items.enumerated()), id: \.offset) { index, item in
-                if IngredientDisplayFormatter.isSectionHeader(item) {
+                if IngredientFormatting.isSectionHeader(item) {
                     Text(item)
                         .font(.system(size: metrics.bodyTextSize, weight: .bold, design: .rounded))
                         .foregroundStyle(RecipeTheme.accentStrong)
@@ -553,18 +553,6 @@ struct RecipeDetailView: View {
             }
         }
         .presentationDetents([.medium])
-    }
-}
-
-private enum IngredientDisplayFormatter {
-    static func isSectionHeader(_ value: String) -> Bool {
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return false }
-        if trimmed.hasSuffix(":") { return true }
-        if trimmed.count > 36 { return false }
-        if trimmed.range(of: #"\d"#, options: .regularExpression) != nil { return false }
-        if trimmed.hasPrefix("-") || trimmed.hasPrefix("•") { return false }
-        return trimmed.split(separator: " ").count <= 4
     }
 }
 
