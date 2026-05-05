@@ -7,6 +7,7 @@ struct ShareComposerView: View {
     let onCancel: () -> Void
     let onComplete: () -> Void
     @State private var selectedPhoto: PhotosPickerItem?
+    @State private var isEditingIngredients = false
 
     var body: some View {
         NavigationStack {
@@ -83,17 +84,6 @@ struct ShareComposerView: View {
                     .foregroundStyle(.primary)
 
                 Spacer()
-
-                PhotosPicker(selection: $selectedPhoto, matching: .images) {
-                    Label("Change Image", systemImage: "photo")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 9)
-                        .background(shareAccent)
-                        .clipShape(Capsule())
-                }
-                .buttonStyle(.plain)
             }
 
             previewImage
@@ -112,13 +102,35 @@ struct ShareComposerView: View {
 
             inputSection(title: "Ingredients") {
                 VStack(alignment: .leading, spacing: 12) {
-                    TextField("One ingredient per line", text: $viewModel.ingredientsText, axis: .vertical)
-                        .shareInputFieldStyle(minHeight: 150)
+                    HStack {
+                        Text(isEditingIngredients ? "Edit ingredients" : "Saved format preview")
+                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .foregroundStyle(.secondary)
 
-                    ShareFormattedIngredientsPreviewCard(
-                        items: IngredientFormatting.lines(from: viewModel.ingredientsText),
-                        accent: shareAccent
-                    )
+                        Spacer()
+
+                        Button {
+                            isEditingIngredients.toggle()
+                        } label: {
+                            Image(systemName: isEditingIngredients ? "checkmark.circle.fill" : "square.and.pencil")
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundStyle(shareAccent)
+                                .frame(width: 28, height: 28)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(isEditingIngredients ? "Done editing ingredients" : "Edit ingredients")
+                    }
+
+                    if isEditingIngredients {
+                        TextField("One ingredient per line", text: $viewModel.ingredientsText, axis: .vertical)
+                            .shareInputFieldStyle(minHeight: 150)
+                    } else {
+                        ShareFormattedIngredientsPreviewCard(
+                            items: ShareIngredientFormatting.lines(from: viewModel.ingredientsText),
+                            accent: shareAccent
+                        )
+                    }
                 }
             }
 
@@ -178,15 +190,38 @@ struct ShareComposerView: View {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
+                    .allowsHitTesting(false)
             } else {
                 sharePlaceholder
+                    .allowsHitTesting(false)
             }
         }
         .frame(maxWidth: .infinity, minHeight: 210, maxHeight: 210)
         .clipped()
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .contentShape(Rectangle())
-        .allowsHitTesting(false)
+        .overlay(alignment: .bottomLeading) {
+            HStack(spacing: 8) {
+                Text(selectedPhoto != nil ? "Custom image selected" : "Image from share")
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(Color.black.opacity(0.34))
+                    .clipShape(Capsule())
+
+                PhotosPicker(selection: $selectedPhoto, matching: .images) {
+                    Label("Change Image", systemImage: "photo")
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(shareAccent)
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(12)
+        }
     }
 
     private func inputSection<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
@@ -238,10 +273,6 @@ private struct ShareFormattedIngredientsPreviewCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Saved format preview")
-                .font(.system(size: 13, weight: .bold, design: .rounded))
-                .foregroundStyle(.secondary)
-
             if items.isEmpty {
                 Text("Ingredients will appear here once extracted or edited.")
                     .font(.system(size: 14, weight: .medium, design: .rounded))
@@ -249,7 +280,7 @@ private struct ShareFormattedIngredientsPreviewCard: View {
             } else {
                 VStack(alignment: .leading, spacing: 10) {
                     ForEach(Array(items.enumerated()), id: \.offset) { index, item in
-                        if IngredientFormatting.isSectionHeader(item) {
+                        if ShareIngredientFormatting.isSectionHeader(item) {
                             Text(item)
                                 .font(.system(size: 15, weight: .bold, design: .rounded))
                                 .foregroundStyle(accent)
@@ -301,6 +332,22 @@ private extension View {
                     .stroke(Color.black.opacity(0.06), lineWidth: 1)
                     .allowsHitTesting(false)
             }
+    }
+}
+
+private enum ShareIngredientFormatting {
+    static func lines(from value: String) -> [String] {
+        ImportedTextSanitizer.cleanMultiline(value)
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
+    static func isSectionHeader(_ value: String) -> Bool {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        if trimmed.hasPrefix("-") || trimmed.hasPrefix("•") { return false }
+        return trimmed.hasSuffix(":")
     }
 }
 

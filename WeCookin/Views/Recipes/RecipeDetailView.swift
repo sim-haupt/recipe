@@ -11,6 +11,7 @@ struct RecipeDetailView: View {
     @State private var isShowingEditSheet = false
     @State private var isShowingCommentSheet = false
     @State private var isShowingRatingSheet = false
+    @State private var isShowingDeleteConfirmation = false
     @State private var selectedCommentPhoto: PhotosPickerItem?
     @State private var commentPhotoData: Data?
     @State private var selectedEditPhoto: PhotosPickerItem?
@@ -116,6 +117,21 @@ struct RecipeDetailView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(viewModel.errorMessage ?? "")
+        }
+        .confirmationDialog("Delete this recipe?", isPresented: $isShowingDeleteConfirmation, titleVisibility: .visible) {
+            Button("Delete Recipe", role: .destructive) {
+                Task {
+                    await viewModel.deleteRecipe()
+                    if viewModel.errorMessage == nil {
+                        isShowingEditSheet = false
+                        dismiss()
+                    }
+                }
+            }
+
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This action cannot be undone.")
         }
         .environment(\.appEnvironment, environment)
     }
@@ -252,7 +268,7 @@ struct RecipeDetailView: View {
                 .foregroundStyle(RecipeTheme.textPrimary)
 
             ForEach(Array(items.enumerated()), id: \.offset) { index, item in
-                if IngredientFormatting.isSectionHeader(item) {
+                if RecipeDetailIngredientFormatting.isSectionHeader(item) {
                     Text(item)
                         .font(.system(size: metrics.bodyTextSize, weight: .bold, design: .rounded))
                         .foregroundStyle(RecipeTheme.accentStrong)
@@ -417,10 +433,11 @@ struct RecipeDetailView: View {
                     TextField("Title", text: $viewModel.editTitle)
                         .recipeInputFieldStyle()
 
-                    TextField("Source URL", text: $viewModel.editSourceURL, axis: .vertical)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .recipeInputFieldStyle(minHeight: 70)
+                    Text("Ingredients")
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+
+                    TextField("One ingredient per line", text: $viewModel.editIngredients, axis: .vertical)
+                        .recipeInputFieldStyle(minHeight: 150)
 
                     Text("Categories")
                         .font(.system(size: 15, weight: .bold, design: .rounded))
@@ -448,11 +465,27 @@ struct RecipeDetailView: View {
                         helperText: "Tags appear as hashtags on the recipe page."
                     )
 
-                    Text("Ingredients")
+                    Text("Link")
                         .font(.system(size: 15, weight: .bold, design: .rounded))
 
-                    TextField("One ingredient per line", text: $viewModel.editIngredients, axis: .vertical)
-                        .recipeInputFieldStyle(minHeight: 150)
+                    TextField("Source URL", text: $viewModel.editSourceURL, axis: .vertical)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .recipeInputFieldStyle(minHeight: 70)
+
+                    Button(role: .destructive) {
+                        isShowingDeleteConfirmation = true
+                    } label: {
+                        Text("Delete Recipe")
+                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(Color.red)
+                            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 8)
                 }
                 .padding(20)
             }
@@ -572,6 +605,15 @@ private extension View {
                     .stroke(Color.black.opacity(0.06), lineWidth: 1)
             }
             .shadow(color: RecipeTheme.mintShadow.opacity(0.45), radius: 12, y: 6)
+    }
+}
+
+private enum RecipeDetailIngredientFormatting {
+    static func isSectionHeader(_ value: String) -> Bool {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        if trimmed.hasPrefix("-") || trimmed.hasPrefix("•") { return false }
+        return trimmed.hasSuffix(":")
     }
 }
 

@@ -155,6 +155,7 @@ private struct AddRecipePreviewEditorView: View {
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var isShowingDebugInspector = false
     @State private var isPresentingImagePicker = false
+    @State private var isEditingIngredients = false
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -271,22 +272,6 @@ private struct AddRecipePreviewEditorView: View {
                     .foregroundStyle(RecipeTheme.textPrimary)
 
                 Spacer()
-
-                Button {
-                    Self.logger.debug("Change Image tapped for source: \(self.viewModel.draft.sourceURL)")
-                    self.viewModel.logPreviewDiagnostics(context: "ChangeImage.tap")
-                    isPresentingImagePicker = true
-                } label: {
-                    Label("Change Image", systemImage: "photo")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(RecipeTheme.textOnAccent)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 9)
-                        .background(RecipeTheme.accentStrong)
-                        .clipShape(Capsule())
-                }
-                .buttonStyle(.plain)
-                .modifier(FrameLoggingModifier(name: "changeImageButton", logger: Self.logger))
             }
 
             previewImage
@@ -298,15 +283,37 @@ private struct AddRecipePreviewEditorView: View {
 
             inputSection(title: "Ingredients") {
                 VStack(alignment: .leading, spacing: 12) {
-                    TextField("One ingredient per line", text: $viewModel.draft.ingredientsText, axis: .vertical)
-                        .recipeFormInputStyle(minHeight: 150)
+                    HStack {
+                        Text(isEditingIngredients ? "Edit ingredients" : "Saved format preview")
+                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .foregroundStyle(.secondary)
 
-                    FormattedIngredientsPreviewCard(
-                        items: IngredientFormatting.lines(from: viewModel.draft.ingredientsText),
-                        accent: RecipeTheme.accentStrong,
-                        textPrimary: RecipeTheme.textPrimary,
-                        surface: Color.white.opacity(0.9)
-                    )
+                        Spacer()
+
+                        Button {
+                            isEditingIngredients.toggle()
+                        } label: {
+                            Image(systemName: isEditingIngredients ? "checkmark.circle.fill" : "square.and.pencil")
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundStyle(RecipeTheme.accentStrong)
+                                .frame(width: 28, height: 28)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(isEditingIngredients ? "Done editing ingredients" : "Edit ingredients")
+                    }
+
+                    if isEditingIngredients {
+                        TextField("One ingredient per line", text: $viewModel.draft.ingredientsText, axis: .vertical)
+                            .recipeFormInputStyle(minHeight: 150)
+                    } else {
+                        FormattedIngredientsPreviewCard(
+                            items: AddRecipeIngredientFormatting.lines(from: viewModel.draft.ingredientsText),
+                            accent: RecipeTheme.accentStrong,
+                            textPrimary: RecipeTheme.textPrimary,
+                            surface: Color.white.opacity(0.9)
+                        )
+                    }
                 }
             }
 
@@ -343,24 +350,42 @@ private struct AddRecipePreviewEditorView: View {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
+                    .allowsHitTesting(false)
             } else {
                 RemoteRecipeImage(imageURL: nil, width: nil, height: 210, placeholderStyle: .pattern("RecipeDetailPattern"))
+                    .allowsHitTesting(false)
             }
         }
         .frame(maxWidth: .infinity, minHeight: 210, maxHeight: 210)
         .clipped()
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .contentShape(Rectangle())
-        .allowsHitTesting(false)
         .overlay(alignment: .bottomLeading) {
-            Text(viewModel.isUsingCustomImage ? "Custom image selected" : "Image from metadata")
-                .font(.system(size: 12, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(Color.black.opacity(0.34))
-                .clipShape(Capsule())
-                .padding(12)
+            HStack(spacing: 8) {
+                Text(viewModel.isUsingCustomImage ? "Custom image selected" : "Image from metadata")
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(Color.black.opacity(0.34))
+                    .clipShape(Capsule())
+
+                Button {
+                    Self.logger.debug("Change Image tapped for source: \(self.viewModel.draft.sourceURL)")
+                    self.viewModel.logPreviewDiagnostics(context: "ChangeImage.tap")
+                    isPresentingImagePicker = true
+                } label: {
+                    Label("Change Image", systemImage: "photo")
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .foregroundStyle(RecipeTheme.textOnAccent)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(RecipeTheme.accentStrong)
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .modifier(FrameLoggingModifier(name: "changeImageButton", logger: Self.logger))
+            }
+            .padding(12)
         }
         .modifier(FrameLoggingModifier(name: "previewImage", logger: Self.logger))
         .simultaneousGesture(
@@ -498,10 +523,6 @@ private struct FormattedIngredientsPreviewCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Saved format preview")
-                .font(.system(size: 13, weight: .bold, design: .rounded))
-                .foregroundStyle(.secondary)
-
             if items.isEmpty {
                 Text("Ingredients will appear here once extracted or edited.")
                     .font(.system(size: 14, weight: .medium, design: .rounded))
@@ -509,7 +530,7 @@ private struct FormattedIngredientsPreviewCard: View {
             } else {
                 VStack(alignment: .leading, spacing: 10) {
                     ForEach(Array(items.enumerated()), id: \.offset) { index, item in
-                        if IngredientFormatting.isSectionHeader(item) {
+                        if AddRecipeIngredientFormatting.isSectionHeader(item) {
                             Text(item)
                                 .font(.system(size: 15, weight: .bold, design: .rounded))
                                 .foregroundStyle(accent)
@@ -562,6 +583,22 @@ private extension View {
                     .allowsHitTesting(false)
             }
             .shadow(color: RecipeTheme.mintShadow.opacity(0.42), radius: 12, y: 6)
+    }
+}
+
+private enum AddRecipeIngredientFormatting {
+    static func lines(from value: String) -> [String] {
+        ImportedTextSanitizer.cleanMultiline(value)
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
+    static func isSectionHeader(_ value: String) -> Bool {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        if trimmed.hasPrefix("-") || trimmed.hasPrefix("•") { return false }
+        return trimmed.hasSuffix(":")
     }
 }
 
