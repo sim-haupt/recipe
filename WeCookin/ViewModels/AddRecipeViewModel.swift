@@ -171,7 +171,12 @@ final class AddRecipeViewModel: ObservableObject {
     private func fetchAIExtractionIfPossible() async -> RecipeAIExtraction? {
         let request = buildEnrichmentRequest()
         guard request.hasEnoughContent else { return nil }
-        return try? await environment.recipeEnrichmentService.enrichRecipeContent(using: request)
+        do {
+            return try await environment.recipeEnrichmentService.enrichRecipeContent(using: request)
+        } catch {
+            errorMessage = error.localizedDescription
+            return nil
+        }
     }
 
     func loadDebugInfo() async {
@@ -214,7 +219,7 @@ final class AddRecipeViewModel: ObservableObject {
 
         let generatedIngredients = (enrichment?.ingredients ?? []).joined(separator: "\n")
 
-        if replaceExistingFields || draft.ingredientsText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        if !generatedIngredients.isEmpty && (replaceExistingFields || draft.ingredientsText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) {
             draft.ingredientsText = generatedIngredients
         }
         logPreviewDiagnostics(context: "generatePreviewContent.completed")

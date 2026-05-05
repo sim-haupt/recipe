@@ -40,12 +40,19 @@ final class ShareViewModel: ObservableObject {
         sourceURL = payload.sourceURL ?? ""
         imageData = payload.imageData
 
-        let enrichment = try? await recipeEnrichmentService.enrichRecipeContent(using: RecipeEnrichmentRequest(
+        let enrichmentRequest = RecipeEnrichmentRequest(
             sourceURL: sourceURL.trimmingCharacters(in: .whitespacesAndNewlines),
             title: ImportedTextSanitizer.isLikelyNoisySocialTitle(title, sourceURL: sourceURL, rawText: rawText) ? "" : title.trimmingCharacters(in: .whitespacesAndNewlines),
             description: description.trimmingCharacters(in: .whitespacesAndNewlines),
             rawText: rawText.trimmingCharacters(in: .whitespacesAndNewlines)
-        ))
+        )
+        let enrichment: RecipeAIExtraction?
+        do {
+            enrichment = try await recipeEnrichmentService.enrichRecipeContent(using: enrichmentRequest)
+        } catch {
+            enrichment = nil
+            errorMessage = error.localizedDescription
+        }
 
         lastGeneratedExtraction = enrichment
         if shouldReplaceTitleWithAI(enrichment?.title) {
@@ -56,7 +63,10 @@ final class ShareViewModel: ObservableObject {
             rawText: rawText,
             aiSummary: enrichment?.summary
         )
-        ingredientsText = (enrichment?.ingredients ?? []).joined(separator: "\n")
+        let generatedIngredients = (enrichment?.ingredients ?? []).joined(separator: "\n")
+        if !generatedIngredients.isEmpty {
+            ingredientsText = generatedIngredients
+        }
         isLoading = false
     }
 

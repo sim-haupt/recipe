@@ -45,6 +45,7 @@ targets:
     info:
       path: Config/WeCookin-Info.plist
       properties:
+        RecipeEnrichmentAPIURL: https://recipe-production-1737.up.railway.app/api/recipe-extract
         UIApplicationSupportsMultipleScenes: false
         UILaunchScreen:
           UIImageName: ""
@@ -68,6 +69,7 @@ targets:
       path: Config/WeCookinShareExtension-Info.plist
       properties:
         CFBundleDisplayName: "Save to WeCookin'"
+        RecipeEnrichmentAPIURL: https://recipe-production-1737.up.railway.app/api/recipe-extract
         NSExtension:
           NSExtensionAttributes:
             NSExtensionActivationRule:

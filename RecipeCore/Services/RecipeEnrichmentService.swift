@@ -12,7 +12,7 @@ enum RecipeEnrichmentError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .backendUnavailable:
-            return "AI recipe extraction is not configured yet."
+            return "AI recipe extraction is unavailable right now."
         case .invalidResponse:
             return "The AI recipe extraction response could not be read."
         }

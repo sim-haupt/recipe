@@ -252,16 +252,23 @@ struct RecipeDetailView: View {
                 .foregroundStyle(RecipeTheme.textPrimary)
 
             ForEach(Array(items.enumerated()), id: \.offset) { index, item in
-                HStack(alignment: .top, spacing: 10) {
-                    Text(usesNumbers ? "\(index + 1)." : "•")
+                if IngredientDisplayFormatter.isSectionHeader(item) {
+                    Text(item)
                         .font(.system(size: metrics.bodyTextSize, weight: .bold, design: .rounded))
                         .foregroundStyle(RecipeTheme.accentStrong)
-                        .frame(width: usesNumbers ? 22 : 10, alignment: .leading)
+                        .padding(.top, index == 0 ? 0 : 6)
+                } else {
+                    HStack(alignment: .top, spacing: 10) {
+                        Text(usesNumbers ? "\(index + 1)." : "•")
+                            .font(.system(size: metrics.bodyTextSize, weight: .bold, design: .rounded))
+                            .foregroundStyle(RecipeTheme.accentStrong)
+                            .frame(width: usesNumbers ? 22 : 10, alignment: .leading)
 
-                    Text(item)
-                        .font(.system(size: metrics.bodyTextSize, weight: .medium, design: .rounded))
-                        .foregroundStyle(RecipeTheme.textPrimary)
-                        .fixedSize(horizontal: false, vertical: true)
+                        Text(item)
+                            .font(.system(size: metrics.bodyTextSize, weight: .medium, design: .rounded))
+                            .foregroundStyle(RecipeTheme.textPrimary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
             }
         }
@@ -546,6 +553,18 @@ struct RecipeDetailView: View {
             }
         }
         .presentationDetents([.medium])
+    }
+}
+
+private enum IngredientDisplayFormatter {
+    static func isSectionHeader(_ value: String) -> Bool {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        if trimmed.hasSuffix(":") { return true }
+        if trimmed.count > 36 { return false }
+        if trimmed.range(of: #"\d"#, options: .regularExpression) != nil { return false }
+        if trimmed.hasPrefix("-") || trimmed.hasPrefix("•") { return false }
+        return trimmed.split(separator: " ").count <= 4
     }
 }
 

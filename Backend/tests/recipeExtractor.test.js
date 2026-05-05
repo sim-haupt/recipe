@@ -68,3 +68,25 @@ test("instagram diagnostics prefer the english recipe block and drop noisy socia
   assert.match(diagnostics.candidateText, /cornstarch/i);
   assert.doesNotMatch(diagnostics.candidateText, /trockenge/i);
 });
+
+test("candidate text preserves grouped ingredient subsection markers", () => {
+  const diagnostics = previewPayloadDiagnostics({
+    sourceURL: "https://www.instagram.com/reel/example/",
+    title: "",
+    description: "",
+    rawText: [
+      "RECIPE:",
+      "-400g firm tofu, pat dried",
+      "-2 Tbsp cornstarch",
+      "Sauce:",
+      "-4 Tbsp soy sauce",
+      "-2 Tbsp white wine vinegar",
+      "To serve:",
+      "-rice",
+      "-spring onions"
+    ].join("\n")
+  });
+
+  assert.match(diagnostics.candidateText, /Sauce:/);
+  assert.match(diagnostics.candidateText, /To serve:/);
+});

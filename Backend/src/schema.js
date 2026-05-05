@@ -15,7 +15,7 @@ export const recipeExtractionSchema = {
       items: {
         type: "string"
       },
-      description: "A list of ingredient lines from the source, always in English."
+      description: "A list of ingredient lines from the source, always in English. Standalone section header lines ending with a colon, such as 'Sauce:' or 'To serve:', are allowed."
     },
     confidence: {
       type: "number",

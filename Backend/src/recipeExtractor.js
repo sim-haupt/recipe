@@ -15,6 +15,7 @@ const SYSTEM_PROMPT = [
   "For social posts, never copy likes, comments, account names, dates, or long caption text into the title.",
   "Prefer titles like main ingredient + style and optionally time, for example '10-Minute Crispy Tofu'.",
   "When a recipe has subsections such as sauce, marinade, topping, glaze, garnish, or to serve, include those ingredient lines too if they are clearly part of the same recipe.",
+  "Preserve grouped ingredient structure by returning standalone section header lines that end with a colon, for example 'Salad:', 'Dressing:', 'Sauce:', or 'To serve:'.",
   "Always return ingredient lines in English.",
   "If the source is only in German, translate the ingredient lines into natural English while preserving amounts and measurements.",
   "If the source includes both German and English, always prefer the English version and discard the duplicate German version.",
@@ -236,6 +237,7 @@ function buildUserPrompt(payload) {
     "- For social URLs, do not copy the caption blob, likes/comments line, account name, or date into the title.",
     "- Prefer a title like main ingredient + style and optionally time, e.g. '10-Minute Crispy Tofu'.",
     "- Extract all recipe ingredients that belong to this recipe, including sauce, marinade, topping, glaze, garnish, or serving components when they are clearly part of the recipe.",
+    "- If the recipe has grouped components, keep that grouping by returning section header lines ending with a colon, such as 'Sauce:', 'Dressing:', 'To serve:', or 'Roasted Tamari Almonds:'.",
     "- Prefer ingredient lines over any intro, ad, commentary, or instruction text.",
     "- Return ingredients only and do not copy instruction sentences into the ingredients array.",
     "- If the same recipe is repeated in two languages, keep one normalized English set of ingredients.",
@@ -368,8 +370,8 @@ function normalizeRecipeCandidateText(value) {
     .replace(/\b(REZEPT|RECIPE)\b/gi, "\n$1")
     .replace(/\b(ZUTATEN|INGREDIENTS|INSTRUCTIONS|DIRECTIONS|METHOD|PREPARATION|NOTES|TIPPS|TIPS|TO ASSEMBLE|ZUM ZUSAMMENBAUEN)\b\s*:?/gi, "\n$&\n")
     .replace(/\s+-(?=\d|[A-Za-zÄÖÜäöü])/g, "\n-")
-    .replace(/([.!?])\s+(?=(Add|Mix|Chop|Serve|Assemble|Cook|Bake|Fry|Heat|Stir|Whisk|Combine|Fold|Alles|Mit|Dann|Zum|Vermischen|Braten|Servieren|Zusammenbauen)\b)/gi, "$1\n")
-    .replace(/(?<=[A-Za-zÄÖÜäöü0-9])\s+(?=(Add|Mix|Chop|Serve|Assemble|Cook|Bake|Fry|Heat|Stir|Whisk|Combine|Fold|Alles|Mit|Dann|Zum|Vermischen|Braten|Servieren|Zusammenbauen)\b)/gi, "\n")
+    .replace(/([.!?])\s+(?=(Add|Mix|Chop|Assemble|Cook|Bake|Fry|Heat|Stir|Whisk|Combine|Fold|Alles|Mit|Dann|Zum|Vermischen|Braten|Servieren|Zusammenbauen)\b)/gi, "$1\n")
+    .replace(/(?<=[A-Za-zÄÖÜäöü0-9])\s+(?=(Add|Mix|Chop|Assemble|Cook|Bake|Fry|Heat|Stir|Whisk|Combine|Fold|Alles|Mit|Dann|Zum|Vermischen|Braten|Servieren|Zusammenbauen)\b)/gi, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
@@ -554,7 +556,7 @@ function cleanRecipeLine(line) {
       .replace(/^[-•]\s*/, "")
       .replace(/^\d+[\.\)]\s*/, "")
       .replace(/^(recipe|rezept)\s*\([^)]*\)\s*:?/i, "")
-      .replace(/^(ingredients|zutaten|sauce|to assemble|zum zusammenbauen)\s*:?/i, "")
+      .replace(/^(ingredients|zutaten)\s*:?/i, "")
       .trim(),
     360
   );
