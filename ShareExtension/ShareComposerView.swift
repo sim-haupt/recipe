@@ -178,6 +178,8 @@ struct ShareComposerView: View {
         .frame(maxWidth: .infinity, minHeight: 210, maxHeight: 210)
         .clipped()
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .contentShape(Rectangle())
+        .allowsHitTesting(false)
     }
 
     private func inputSection<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {

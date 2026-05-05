@@ -11,6 +11,9 @@ const SYSTEM_PROMPT = [
   "For Instagram, TikTok, reels, or other social posts, the useful recipe content may appear only in the caption or page description.",
   "When social captions contain recipe data inline, extract ingredient lines from dashed lines, numbered lines, emoji-prefixed lines, or short inventory-style sentences.",
   "Social captions may be bilingual or duplicated in multiple languages. If the same recipe appears twice in different languages, merge it into one clean extraction instead of duplicating the recipe.",
+  "Generate a short natural English recipe title based on the recipe itself, not on page chrome or social engagement text.",
+  "For social posts, never copy likes, comments, account names, dates, or long caption text into the title.",
+  "Prefer titles like main ingredient + style and optionally time, for example '10-Minute Crispy Tofu'.",
   "Always return ingredient lines in English.",
   "If the source is only in German, translate the ingredient lines into natural English while preserving amounts and measurements.",
   "If the source includes both German and English, always prefer the English version and discard the duplicate German version.",
@@ -160,11 +163,34 @@ function normalizePayload(payload = {}) {
 function normalizeExtraction(value = {}, request = {}) {
   const heuristic = heuristicExtractionFromRequest(request);
   const ingredients = normalizeRecipeArray(value.ingredients, 40, 240);
+  const mergedIngredients = mergeIngredients(ingredients, heuristic.ingredients, request);
   return {
+    title: normalizeGeneratedTitle(value.title, request, heuristic.title),
     summary: clampString(value.summary, 3000).replace(/\s+/g, " ").trim(),
-    ingredients: shouldUseHeuristicIngredients(ingredients) ? heuristic.ingredients : ingredients,
+    ingredients: mergedIngredients,
     confidence: normalizeConfidence(value.confidence)
   };
+}
+
+function normalizeGeneratedTitle(title, request = {}, fallbackTitle = "") {
+  const cleaned = clampString(
+    cleanRecipeLine(stripSocialLeadNoise(title || ""))
+      .replace(/^[“"'`]+|[”"'`]+$/g, "")
+      .replace(/\s+/g, " ")
+      .trim(),
+    90
+  );
+
+  if (cleaned && !looksLikeNoisySocialTitle(cleaned)) {
+    return cleaned;
+  }
+
+  const requestTitle = clampString(stripSocialLeadNoise(request.title || ""), 90);
+  if (requestTitle && !looksLikeNoisySocialTitle(requestTitle)) {
+    return requestTitle;
+  }
+
+  return clampString(fallbackTitle || "Imported Recipe", 90);
 }
 
 function normalizeStringArray(value, maxItems, maxLength) {
@@ -207,6 +233,9 @@ function buildUserPrompt(payload) {
 
   return [
     "Extraction guidance:",
+    "- Generate a short English recipe title based on the actual recipe content.",
+    "- For social URLs, do not copy the caption blob, likes/comments line, account name, or date into the title.",
+    "- Prefer a title like main ingredient + style and optionally time, e.g. '10-Minute Crispy Tofu'.",
     "- Prefer ingredient lines over any intro, ad, commentary, or instruction text.",
     "- Return ingredients only.",
     "- If the same recipe is repeated in two languages, keep one normalized English set of ingredients.",
@@ -227,11 +256,26 @@ function buildUserPrompt(payload) {
 }
 
 function extractCandidateText(payload) {
-  return normalizeRecipeCandidateText(
+  const normalizedText = normalizeRecipeCandidateText(
     [payload.description, payload.rawText, payload.fetchedDescription, payload.fetchedText]
       .filter(Boolean)
       .join("\n")
   );
+
+  const preferredText = preferredRecipeTextBlock(normalizedText);
+
+  const lines = preferredText
+    .split(/\n+/)
+    .map((line) => stripSocialLeadNoise(line).trim())
+    .filter(Boolean);
+
+  const introLines = normalizedText
+    .split(/\n+/)
+    .map((line) => stripSocialLeadNoise(line).trim())
+    .filter(Boolean);
+
+  const preferredLines = preferredRecipeLines(lines, introLines);
+  return dedupe(preferredLines).join("\n");
 }
 
 async function enrichPayloadWithRemoteContent(payload) {
@@ -336,6 +380,42 @@ function normalizeRecipeCandidateText(value) {
     .trim();
 }
 
+function preferredRecipeLines(lines, introCandidates = []) {
+  if (lines.length === 0) return [];
+
+  const sanitized = lines
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+
+  const intro = introCandidates
+    .map(stripSocialLeadNoise)
+    .map((line) => line.replace(/^[:\-\s]+/, "").trim())
+    .filter(Boolean)
+    .filter((line) => !looksLikeIngredientLine(line))
+    .filter((line) => !looksLikeNoisySocialTitle(line))
+    .slice(0, 2);
+
+  return [...intro, ...sanitized.slice(0, 80)];
+}
+
+function preferredRecipeTextBlock(text) {
+  const englishMatch = text.match(/(?:^|\n)(RECIPE(?:\s*[:(]|$)[\s\S]*)/i);
+  const germanMatch = text.match(/(?:^|\n)(REZEPT(?:\s*[:(]|$)[\s\S]*)/i);
+  const englishIndex = englishMatch ? text.indexOf(englishMatch[1]) : -1;
+  const germanIndex = germanMatch ? text.indexOf(germanMatch[1]) : -1;
+
+  if (englishIndex !== -1) {
+    const englishBlock = text.slice(englishIndex, germanIndex !== -1 && germanIndex > englishIndex ? germanIndex : undefined);
+    return englishBlock.trim();
+  }
+
+  if (germanIndex !== -1) {
+    return text.slice(germanIndex).trim();
+  }
+
+  return text;
+}
+
 function focusRecipeLines(lines) {
   const ingredientSection = sectionLines(
     lines,
@@ -402,6 +482,15 @@ function isUsefulContentLine(line) {
   return !excludedPhrases.some((phrase) => lower.includes(phrase));
 }
 
+function looksLikeCaptionOutro(line) {
+  const lower = line.toLowerCase();
+  return lower.includes("much love")
+    || lower.includes("alles liebe")
+    || lower.includes("schaut bei")
+    || lower.includes("code:")
+    || lower.includes("taste that matters");
+}
+
 function capture(html, pattern) {
   const regex = new RegExp(pattern, "is");
   const match = html.match(regex);
@@ -461,16 +550,17 @@ function cleanRecipeLine(line) {
       .replace(/^[-•]\s*/, "")
       .replace(/^\d+[\.\)]\s*/, "")
       .replace(/^(recipe|rezept)\s*\([^)]*\)\s*:?/i, "")
+      .replace(/^(ingredients|zutaten|sauce|to assemble|zum zusammenbauen)\s*:?/i, "")
       .trim(),
     360
   );
 }
 
 function heuristicExtractionFromRequest(request = {}) {
-  const sourceText = normalizeRecipeCandidateText(
+  const sourceText = extractCandidateText(
     [request.description, request.rawText, request.fetchedDescription, request.fetchedText]
       .filter(Boolean)
-      .join("\n")
+      .reduce((accumulator, value, index) => `${accumulator}${index > 0 ? "\n" : ""}${value}`, "")
   );
 
   const lines = sourceText
@@ -485,6 +575,7 @@ function heuristicExtractionFromRequest(request = {}) {
   ).slice(0, 24);
 
   return {
+    title: heuristicTitleFromLines(lines),
     summary: summarizeFromLines(lines),
     ingredients
   };
@@ -493,20 +584,109 @@ function heuristicExtractionFromRequest(request = {}) {
 function looksLikeIngredientLine(line) {
   const lower = line.toLowerCase();
   if (lower.length > 180 || lower.includes("likes") || lower.includes("comments") || lower.includes("@")) return false;
+  if (looksLikeCaptionOutro(line)) return false;
   return /^[-•]/.test(line)
     || /\b(\d+\/\d+|\d+(?:[.,]\d+)?)\s*(g|kg|ml|l|tbsp|tsp|el|tl|cup|cups|clove|cloves|dose|cans?)\b/i.test(line)
-    || /\b(onion|garlic|ginger|chickpeas?|tomato paste|mayo|lemon juice|bread|lettuce|cucumber|zwiebel|knoblauch|ingwer|kichererbsen|tomatenmark|zitrone)\b/i.test(lower);
+    || /\b(onion|garlic|ginger|chickpeas?|tomato paste|mayo|lemon juice|bread|lettuce|cucumber|tofu|salt|pepper|cornstarch|soy sauce|vinegar|agave|maple syrup|hot sauce|water|zwiebel|knoblauch|ingwer|kichererbsen|tomatenmark|zitrone|tofu|salz|maisstärke|sojasauce|essig|agavendicksaft|ahornsirup|wasser)\b/i.test(lower);
 }
 
 function summarizeFromLines(lines) {
   return clampString(
-    (lines.find((line) => !looksLikeIngredientLine(line)) || lines[0] || "")
+    (lines.find((line) => !looksLikeIngredientLine(line) && !looksLikeNoisySocialTitle(line)) || lines[0] || "")
       .replace(/\s+/g, " ")
       .trim(),
     220
   );
 }
 
+function heuristicTitleFromLines(lines) {
+  const preferred = lines
+    .map(stripSocialLeadNoise)
+    .map((line) => line.replace(/^[:\-\s]+/, "").trim())
+    .find((line) => line.length > 3 && line.length < 80 && !looksLikeIngredientLine(line) && !looksLikeNoisySocialTitle(line));
+
+  if (preferred) {
+    return clampString(preferred.replace(/[“”"]/g, "").trim(), 70);
+  }
+
+  const firstIngredient = lines.find(looksLikeIngredientLine);
+  if (firstIngredient) {
+    const ingredientTitle = firstIngredient
+      .replace(/^[-•]\s*/, "")
+      .replace(/^\d+(?:[.,]\d+)?\s*(g|kg|ml|l|tbsp|tsp|el|tl|cup|cups)\s*/i, "")
+      .replace(/\b(firm|extra firm|dry|patted dry|optional)\b/gi, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (ingredientTitle) {
+      return clampString(`${toTitleCase(ingredientTitle)} Recipe`, 70);
+    }
+  }
+
+  return "Imported Recipe";
+}
+
+function mergeIngredients(primary, fallback, request = {}) {
+  if (shouldUseHeuristicIngredients(primary)) {
+    return fallback;
+  }
+
+  if (!isSocialSourceURL(request.sourceURL) || fallback.length === 0) {
+    return primary;
+  }
+
+  const primaryText = primary.join("\n").toLowerCase();
+  const missingImportantFallback = fallback
+    .slice(0, Math.min(4, fallback.length))
+    .some((line) => {
+      const keywords = ingredientKeywords(line);
+      return keywords.length > 0 && keywords.some((keyword) => !primaryText.includes(keyword));
+    });
+
+  if (!missingImportantFallback && primary.length >= Math.max(5, fallback.length - 1)) {
+    return primary;
+  }
+
+  return dedupe([...fallback, ...primary]).slice(0, 24);
+}
+
+function ingredientKeywords(line) {
+  return (line.toLowerCase().match(/[a-z]{4,}/g) || [])
+    .filter((token) => !["tablespoon", "teaspoon", "optional", "recipe", "sauce", "water"].includes(token));
+}
+
 function shouldUseHeuristicIngredients(ingredients) {
   return ingredients.length === 0 || (ingredients.length === 1 && ingredients[0].length > 220);
+}
+
+function stripSocialLeadNoise(line) {
+  return (line || "")
+    .replace(/^\s*\d+[A-Z]?\s+likes,\s*\d+\s+comments\s*-\s*.*?:\s*/i, "")
+    .replace(/^\s*\d+[A-Z]?\s+likes\s*-\s*.*?:\s*/i, "")
+    .replace(/^\s*[^:]{0,120}\bon\s+[A-Z][a-z]+\s+\d{1,2},\s+\d{4}:\s*/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function looksLikeNoisySocialTitle(line) {
+  const lower = (line || "").toLowerCase();
+  return lower.length > 120
+    || lower.includes("likes")
+    || lower.includes("comments")
+    || lower.includes("@")
+    || lower.includes("advertisement")
+    || lower.includes("werbung/ad")
+    || lower.includes("this is my go to")
+    || lower.includes("much love");
+}
+
+function isSocialSourceURL(sourceURL = "") {
+  return /instagram\.com|tiktok\.com|facebook\.com|pinterest\.com/i.test(sourceURL);
+}
+
+function toTitleCase(value) {
+  return value
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
 }

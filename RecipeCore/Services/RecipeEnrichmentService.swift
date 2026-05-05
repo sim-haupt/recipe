@@ -93,6 +93,7 @@ final class RecipeEnrichmentService: RecipeEnrichmentServicing {
 
     private func mergedExtraction(primary: RecipeAIExtraction, fallback: RecipeAIExtraction) -> RecipeAIExtraction {
         RecipeAIExtraction(
+            title: primary.title.isEmpty ? fallback.title : primary.title,
             summary: primary.summary.isEmpty ? fallback.summary : primary.summary,
             ingredients: shouldPreferFallbackIngredients(primary.ingredients, fallback: fallback.ingredients) ? fallback.ingredients : primary.ingredients,
             confidence: primary.confidence ?? fallback.confidence
@@ -176,7 +177,7 @@ struct RecipeEnrichmentDebugInfo: Decodable {
             fetchedDescription: "",
             fetchedText: "",
             candidateText: normalizedRawText,
-            extraction: RecipeAIExtraction(summary: summary, ingredients: [], confidence: nil)
+            extraction: RecipeAIExtraction(title: "", summary: summary, ingredients: [], confidence: nil)
         )
     }
 }
@@ -195,12 +196,33 @@ private final class HeuristicRecipeEnrichmentService {
             .filter { !$0.isEmpty }
 
         let ingredients = extractIngredients(from: rawLines)
+        let title = generateTitle(from: request, lines: rawLines)
 
         return RecipeAIExtraction(
+            title: title,
             summary: summary,
             ingredients: ingredients,
             confidence: inferredConfidence(summary: summary, ingredients: ingredients)
         )
+    }
+
+    private func generateTitle(from request: RecipeEnrichmentRequest, lines: [String]) -> String {
+        let existingTitle = ImportedTextSanitizer.cleanInline(request.title)
+        if !ImportedTextSanitizer.isLikelyNoisySocialTitle(existingTitle, sourceURL: request.sourceURL, rawText: request.rawText) {
+            return existingTitle
+        }
+
+        let titleLine = lines
+            .map { ImportedTextSanitizer.cleanInline($0) }
+            .first { line in
+                !line.isEmpty
+                    && line.count <= 80
+                    && !line.localizedCaseInsensitiveContains("likes")
+                    && !line.localizedCaseInsensitiveContains("comments")
+                    && !line.contains("@")
+            }
+
+        return titleLine ?? ""
     }
 
     private func extractIngredients(from lines: [String]) -> [String] {
@@ -276,12 +298,14 @@ private struct BackendRecipeEnrichmentRequest: Encodable {
 }
 
 private struct BackendRecipeEnrichmentResponse: Decodable {
+    let title: String?
     let summary: String?
     let ingredients: [String]?
     let confidence: Double?
 
     var asExtraction: RecipeAIExtraction {
         RecipeAIExtraction(
+            title: title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "",
             summary: summary?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "",
             ingredients: ingredients ?? [],
             confidence: confidence

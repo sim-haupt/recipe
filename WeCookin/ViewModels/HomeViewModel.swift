@@ -129,6 +129,7 @@ final class HomeViewModel: ObservableObject {
                     rawText: draft.rawText
                 ))
                 let draftEnrichment = RecipeAIExtraction(
+                    title: draft.title,
                     summary: ImportedTextSanitizer.preferredRecipeDescription(
                         baseDescription: draft.description,
                         rawText: draft.rawText,

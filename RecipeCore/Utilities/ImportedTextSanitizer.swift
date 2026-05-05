@@ -166,4 +166,27 @@ enum ImportedTextSanitizer {
             partialResult + max(0, value.components(separatedBy: marker).count - 1)
         }
     }
+
+    static func isLikelyNoisySocialTitle(_ title: String, sourceURL: String?, rawText: String) -> Bool {
+        let cleanedTitle = cleanInline(title)
+        guard !cleanedTitle.isEmpty else { return true }
+        let isSocialSource = sourceURL?.localizedCaseInsensitiveContains("instagram.com") == true
+            || sourceURL?.localizedCaseInsensitiveContains("tiktok.com") == true
+            || sourceURL?.localizedCaseInsensitiveContains("facebook.com") == true
+            || sourceURL?.localizedCaseInsensitiveContains("pinterest.com") == true
+
+        let lowercased = cleanedTitle.lowercased()
+        if cleanedTitle.count > 120 { return true }
+        if lowercased.contains("likes") || lowercased.contains("comments") || cleanedTitle.contains("@") { return true }
+        if lowercased.contains("werbung/ad") || lowercased.contains("advertisement") { return true }
+        if isSocialSource, cleanedTitle.count > 80 { return true }
+
+        let normalizedRawText = cleanMultiline(rawText)
+        let titlePrefix = String(cleanedTitle.prefix(min(cleanedTitle.count, 60)))
+        if isSocialSource && !normalizedRawText.isEmpty && !titlePrefix.isEmpty && normalizedRawText.hasPrefix(titlePrefix) {
+            return true
+        }
+
+        return false
+    }
 }

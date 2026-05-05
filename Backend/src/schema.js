@@ -2,6 +2,10 @@ export const recipeExtractionSchema = {
   type: "object",
   additionalProperties: false,
   properties: {
+    title: {
+      type: "string",
+      description: "A short natural English recipe title inferred from the source content."
+    },
     summary: {
       type: "string",
       description: "A short plain-language recipe summary."
@@ -18,5 +22,5 @@ export const recipeExtractionSchema = {
       description: "A 0-1 confidence estimate for the extraction."
     }
   },
-  required: ["summary", "ingredients", "confidence"]
+  required: ["title", "summary", "ingredients", "confidence"]
 };

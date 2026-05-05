@@ -44,3 +44,27 @@ test("instagram payload diagnostics strip embed-like markup from candidate text"
   assert.match(diagnostics.candidateText, /RECIPE/i);
   assert.match(diagnostics.candidateText, /chickpeas/i);
 });
+
+test("instagram diagnostics prefer the english recipe block and drop noisy social lead text", () => {
+  const diagnostics = previewPayloadDiagnostics({
+    sourceURL: "https://www.instagram.com/reel/Ckyu1Q3K10g/",
+    title: "168K likes, 763 comments - fitgreenmind on November 10, 2022: 10min TOFU",
+    description: "",
+    rawText: [
+      "168K likes, 763 comments - fitgreenmind on November 10, 2022: \"10min TOFU😍 This is my go to recipe for tofu\"",
+      "REZEPT (2 Portionen,10min Zubereitungszeit):",
+      "-400g Tofu, trockenge tupft",
+      "-2 El Maisstärke",
+      "RECIPE (2 servings,10min prep time):",
+      "-400g firm tofu, pat dried",
+      "-2 Tbsp cornstarch",
+      "-salt to taste"
+    ].join("\n")
+  });
+
+  assert.doesNotMatch(diagnostics.candidateText, /168K likes/i);
+  assert.match(diagnostics.candidateText, /RECIPE/i);
+  assert.match(diagnostics.candidateText, /firm tofu/i);
+  assert.match(diagnostics.candidateText, /cornstarch/i);
+  assert.doesNotMatch(diagnostics.candidateText, /trockenge/i);
+});

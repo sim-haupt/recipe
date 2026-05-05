@@ -80,6 +80,19 @@ targets:
               NSExtensionActivationSupportsWebPageWithMaxCount: 1
           NSExtensionPointIdentifier: com.apple.share-services
           NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareViewController
+  WeCookinTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: WeCookinTests
+    dependencies:
+      - target: WeCookin
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.wecookin.tests
+        SWIFT_VERSION: 5.10
+        IPHONEOS_DEPLOYMENT_TARGET: 17.0
+        TARGETED_DEVICE_FAMILY: 1
 schemes:
   WeCookin:
     build:

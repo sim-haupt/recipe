@@ -34,7 +34,7 @@ final class ShareViewModel: ObservableObject {
 
     func load() async {
         let payload = await importer.extractPayload(from: extensionItems)
-        title = payload.title
+        title = sanitizedImportedTitle(payload.title, sourceURL: payload.sourceURL ?? "", rawText: payload.rawText)
         description = payload.description
         rawText = payload.rawText
         sourceURL = payload.sourceURL ?? ""
@@ -42,12 +42,15 @@ final class ShareViewModel: ObservableObject {
 
         let enrichment = try? await recipeEnrichmentService.enrichRecipeContent(using: RecipeEnrichmentRequest(
             sourceURL: sourceURL.trimmingCharacters(in: .whitespacesAndNewlines),
-            title: title.trimmingCharacters(in: .whitespacesAndNewlines),
+            title: ImportedTextSanitizer.isLikelyNoisySocialTitle(title, sourceURL: sourceURL, rawText: rawText) ? "" : title.trimmingCharacters(in: .whitespacesAndNewlines),
             description: description.trimmingCharacters(in: .whitespacesAndNewlines),
             rawText: rawText.trimmingCharacters(in: .whitespacesAndNewlines)
         ))
 
         lastGeneratedExtraction = enrichment
+        if shouldReplaceTitleWithAI(enrichment?.title) {
+            title = enrichment?.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? title
+        }
         description = ImportedTextSanitizer.preferredRecipeDescription(
             baseDescription: description,
             rawText: rawText,
@@ -96,6 +99,26 @@ final class ShareViewModel: ObservableObject {
             .components(separatedBy: .newlines)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
+    }
+
+    private func sanitizedImportedTitle(_ title: String, sourceURL: String, rawText: String) -> String {
+        let cleaned = ImportedTextSanitizer.cleanInline(title)
+        if ImportedTextSanitizer.isLikelyNoisySocialTitle(cleaned, sourceURL: sourceURL, rawText: rawText) {
+            return ""
+        }
+        return cleaned
+    }
+
+    private func shouldReplaceTitleWithAI(_ generatedTitle: String?) -> Bool {
+        guard let generatedTitle = generatedTitle?.trimmingCharacters(in: .whitespacesAndNewlines), !generatedTitle.isEmpty else {
+            return false
+        }
+
+        if title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return true
+        }
+
+        return ImportedTextSanitizer.isLikelyNoisySocialTitle(title, sourceURL: sourceURL, rawText: rawText)
     }
 }
 

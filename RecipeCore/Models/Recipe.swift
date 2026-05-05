@@ -1,16 +1,19 @@
 import Foundation
 
 struct RecipeAIExtraction: Codable, Hashable {
+    var title: String
     var summary: String
     var ingredients: [String]
     var confidence: Double?
 
     var hasMeaningfulContent: Bool {
-        !summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || !summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             || !ingredients.isEmpty
     }
 
     static let empty = RecipeAIExtraction(
+        title: "",
         summary: "",
         ingredients: [],
         confidence: nil

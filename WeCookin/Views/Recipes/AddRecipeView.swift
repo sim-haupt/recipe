@@ -166,6 +166,11 @@ private struct AddRecipePreviewEditorView: View {
             .padding(.top, 18)
             .padding(.bottom, 28)
         }
+        .simultaneousGesture(
+            TapGesture().onEnded {
+                Self.logger.debug("Preview root received tap for source: \(self.viewModel.draft.sourceURL, privacy: .public)")
+            }
+        )
         .background(RecipeTheme.pageGradient.ignoresSafeArea())
         .navigationTitle("Recipe Preview")
         .navigationBarTitleDisplayMode(.inline)
@@ -201,6 +206,9 @@ private struct AddRecipePreviewEditorView: View {
         }
         .onChange(of: isShowingDebugInspector) { _, isPresented in
             Self.logger.debug("Inspect AI Input sheet state changed: \(isPresented)")
+        }
+        .task {
+            viewModel.logPreviewDiagnostics(context: "AddRecipePreviewEditorView.task")
         }
     }
 
@@ -247,6 +255,12 @@ private struct AddRecipePreviewEditorView: View {
                 .allowsHitTesting(false)
         }
         .shadow(color: RecipeTheme.shadow.opacity(0.55), radius: 10, y: 6)
+        .modifier(FrameLoggingModifier(name: "previewSourceCard", logger: Self.logger))
+        .simultaneousGesture(
+            TapGesture().onEnded {
+                Self.logger.debug("Preview source card received tap")
+            }
+        )
     }
 
     private var generatedPreviewCard: some View {
@@ -260,6 +274,7 @@ private struct AddRecipePreviewEditorView: View {
 
                 Button {
                     Self.logger.debug("Change Image tapped for source: \(self.viewModel.draft.sourceURL)")
+                    self.viewModel.logPreviewDiagnostics(context: "ChangeImage.tap")
                     isPresentingImagePicker = true
                 } label: {
                     Label("Change Image", systemImage: "photo")
@@ -271,6 +286,7 @@ private struct AddRecipePreviewEditorView: View {
                         .clipShape(Capsule())
                 }
                 .buttonStyle(.plain)
+                .modifier(FrameLoggingModifier(name: "changeImageButton", logger: Self.logger))
             }
 
             previewImage
@@ -307,6 +323,7 @@ private struct AddRecipePreviewEditorView: View {
                 .allowsHitTesting(false)
         }
         .shadow(color: RecipeTheme.shadow.opacity(0.55), radius: 10, y: 6)
+        .modifier(FrameLoggingModifier(name: "generatedPreviewCard", logger: Self.logger))
     }
 
     @ViewBuilder
@@ -324,6 +341,8 @@ private struct AddRecipePreviewEditorView: View {
         .frame(maxWidth: .infinity, minHeight: 210, maxHeight: 210)
         .clipped()
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .contentShape(Rectangle())
+        .allowsHitTesting(false)
         .overlay(alignment: .bottomLeading) {
             Text(viewModel.isUsingCustomImage ? "Custom image selected" : "Image from metadata")
                 .font(.system(size: 12, weight: .semibold, design: .rounded))
@@ -334,6 +353,12 @@ private struct AddRecipePreviewEditorView: View {
                 .clipShape(Capsule())
                 .padding(12)
         }
+        .modifier(FrameLoggingModifier(name: "previewImage", logger: Self.logger))
+        .simultaneousGesture(
+            TapGesture().onEnded {
+                Self.logger.debug("Preview image container received tap")
+            }
+        )
     }
 
     private func inputSection<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
@@ -349,6 +374,7 @@ private struct AddRecipePreviewEditorView: View {
     private var inspectAIButton: some View {
         Button {
             Self.logger.debug("Inspect AI Input tapped for source: \(self.viewModel.draft.sourceURL)")
+            self.viewModel.logPreviewDiagnostics(context: "InspectAIButton.tap")
             isShowingDebugInspector = true
             Task {
                 await viewModel.loadDebugInfo()
@@ -365,6 +391,7 @@ private struct AddRecipePreviewEditorView: View {
         }
         .buttonStyle(.plain)
         .disabled(viewModel.isLoadingDebugInfo)
+        .modifier(FrameLoggingModifier(name: "inspectAIButton", logger: Self.logger))
     }
 
     private var debugInspectorSheet: some View {
@@ -391,6 +418,8 @@ private struct AddRecipePreviewEditorView: View {
                         debugField(title: "Backend Fetched Description", value: debugInfo.fetchedDescription)
                         debugField(title: "Backend Fetched Text", value: debugInfo.fetchedText)
                         debugField(title: "Candidate Text Sent To GPT", value: debugInfo.candidateText)
+                        debugField(title: "GPT Generated Title", value: debugInfo.extraction.title)
+                        debugField(title: "GPT Extracted Ingredients", value: debugInfo.extraction.ingredients.joined(separator: "\n"))
                         debugField(title: "System Prompt", value: debugInfo.systemPrompt)
                         debugField(title: "User Prompt", value: debugInfo.userPrompt)
                     } else if let debugErrorMessage = viewModel.debugErrorMessage {
@@ -469,6 +498,27 @@ private extension View {
                     .allowsHitTesting(false)
             }
             .shadow(color: RecipeTheme.mintShadow.opacity(0.42), radius: 12, y: 6)
+    }
+}
+
+private struct FrameLoggingModifier: ViewModifier {
+    let name: String
+    let logger: Logger
+
+    func body(content: Content) -> some View {
+        content.background(
+            GeometryReader { proxy in
+                Color.clear
+                    .task(id: frameSignature(proxy.frame(in: .global))) {
+                        let frame = proxy.frame(in: .global)
+                        logger.debug("\(self.name, privacy: .public) frame x=\(frame.origin.x) y=\(frame.origin.y) w=\(frame.size.width) h=\(frame.size.height)")
+                    }
+            }
+        )
+    }
+
+    private func frameSignature(_ frame: CGRect) -> String {
+        "\(frame.origin.x.rounded())-\(frame.origin.y.rounded())-\(frame.size.width.rounded())-\(frame.size.height.rounded())"
     }
 }
 

@@ -1,7 +1,11 @@
 import Foundation
+import UIKit
+import os
 
 @MainActor
 final class AddRecipeViewModel: ObservableObject {
+    private static let logger = Logger(subsystem: "WeCookin", category: "AddRecipeViewModel")
+
     @Published var draft = RecipeComposerDraft(title: "", description: "", sourceURL: "", categories: [], tags: [], comments: "", rating: 0)
     @Published var isSaving = false
     @Published var isImportingURL = false
@@ -30,12 +34,14 @@ final class AddRecipeViewModel: ObservableObject {
     func setCustomSelectedImageData(_ data: Data?) {
         selectedImageData = data
         isUsingCustomImage = data != nil
+        logPreviewDiagnostics(context: "setCustomSelectedImageData")
     }
 
     func beginEditingSourceURL() {
         hasResolvedSourcePreview = false
         debugInfo = nil
         debugErrorMessage = nil
+        logPreviewDiagnostics(context: "beginEditingSourceURL")
     }
 
     func generatePreviewFromSourceURL() async {
@@ -83,7 +89,11 @@ final class AddRecipeViewModel: ObservableObject {
             if Task.isCancelled { return }
 
             let isNewImport = imported.canonicalURL != lastImportedURL
-            draft.title = imported.title
+            draft.title = sanitizedImportedTitle(
+                imported.title,
+                sourceURL: imported.canonicalURL,
+                rawText: imported.rawText
+            )
             importedRawText = imported.rawText
             importedDescription = imported.description
             if draft.sourceURL != imported.canonicalURL {
@@ -97,6 +107,7 @@ final class AddRecipeViewModel: ObservableObject {
             }
             lastImportedURL = imported.canonicalURL
             hasResolvedSourcePreview = true
+            logPreviewDiagnostics(context: "fetchMetadataFromSourceURL.afterImport")
 
             await generatePreviewContent(
                 importedDescription: imported.description,
@@ -181,6 +192,7 @@ final class AddRecipeViewModel: ObservableObject {
             debugInfo = nil
             debugErrorMessage = error.localizedDescription
         }
+        logPreviewDiagnostics(context: "loadDebugInfo.completed")
     }
 
     private func generatePreviewContent(importedDescription: String, replaceExistingFields: Bool) async {
@@ -189,6 +201,10 @@ final class AddRecipeViewModel: ObservableObject {
 
         let enrichment = await fetchAIExtractionIfPossible()
         lastGeneratedExtraction = enrichment
+
+        if shouldReplaceTitleWithAI(enrichment?.title) {
+            draft.title = enrichment?.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? draft.title
+        }
 
         draft.description = ImportedTextSanitizer.preferredRecipeDescription(
             baseDescription: importedDescription,
@@ -201,12 +217,14 @@ final class AddRecipeViewModel: ObservableObject {
         if replaceExistingFields || draft.ingredientsText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             draft.ingredientsText = generatedIngredients
         }
+        logPreviewDiagnostics(context: "generatePreviewContent.completed")
     }
 
     private func mergedExtraction(using generatedExtraction: RecipeAIExtraction?, description: String) -> RecipeAIExtraction? {
         let ingredients = parsedLines(from: draft.ingredientsText)
 
         let extraction = RecipeAIExtraction(
+            title: draft.title.trimmingCharacters(in: .whitespacesAndNewlines),
             summary: description,
             ingredients: ingredients,
             confidence: generatedExtraction?.confidence ?? lastGeneratedExtraction?.confidence
@@ -223,13 +241,89 @@ final class AddRecipeViewModel: ObservableObject {
     }
 
     private func buildEnrichmentRequest() -> RecipeEnrichmentRequest {
+        let titleForEnrichment = ImportedTextSanitizer.isLikelyNoisySocialTitle(
+            draft.title,
+            sourceURL: draft.sourceURL,
+            rawText: importedRawText
+        ) ? "" : draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
+
         RecipeEnrichmentRequest(
             sourceURL: draft.sourceURL.trimmingCharacters(in: .whitespacesAndNewlines),
-            title: draft.title.trimmingCharacters(in: .whitespacesAndNewlines),
+            title: titleForEnrichment,
             description: draft.description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 ? importedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
                 : draft.description.trimmingCharacters(in: .whitespacesAndNewlines),
             rawText: importedRawText.trimmingCharacters(in: .whitespacesAndNewlines)
         )
+    }
+
+    private func sanitizedImportedTitle(_ title: String, sourceURL: String, rawText: String) -> String {
+        let cleaned = ImportedTextSanitizer.cleanInline(title)
+        if ImportedTextSanitizer.isLikelyNoisySocialTitle(cleaned, sourceURL: sourceURL, rawText: rawText) {
+            return ""
+        }
+        return cleaned
+    }
+
+    private func shouldReplaceTitleWithAI(_ generatedTitle: String?) -> Bool {
+        guard let generatedTitle = generatedTitle?.trimmingCharacters(in: .whitespacesAndNewlines), !generatedTitle.isEmpty else {
+            return false
+        }
+
+        if draft.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return true
+        }
+
+        return ImportedTextSanitizer.isLikelyNoisySocialTitle(
+            draft.title,
+            sourceURL: draft.sourceURL,
+            rawText: importedRawText
+        )
+    }
+
+    func previewDiagnosticsSnapshot(context: String) -> String {
+        let request = buildEnrichmentRequest()
+        let imageSizeDescription: String
+        if let selectedImageData, let image = UIImage(data: selectedImageData) {
+            imageSizeDescription = "\(Int(image.size.width))x\(Int(image.size.height))"
+        } else {
+            imageSizeDescription = "nil"
+        }
+
+        let host = URL(string: draft.sourceURL)?.host ?? "nil"
+        let platform = if host.contains("instagram.com") {
+            "instagram"
+        } else if host.contains("tiktok.com") {
+            "tiktok"
+        } else {
+            "web"
+        }
+
+        return """
+        [\(context)] \
+        sourceURL=\(draft.sourceURL) \
+        host=\(host) \
+        platform=\(platform) \
+        titleLength=\(draft.title.count) \
+        descriptionLength=\(draft.description.count) \
+        rawTextLength=\(importedRawText.count) \
+        ingredientsLength=\(draft.ingredientsText.count) \
+        isSaving=\(isSaving) \
+        isImportingURL=\(isImportingURL) \
+        isGeneratingPreview=\(isGeneratingPreview) \
+        isLoadingDebugInfo=\(isLoadingDebugInfo) \
+        hasResolvedSourcePreview=\(hasResolvedSourcePreview) \
+        hasError=\(errorMessage != nil) \
+        debugError=\(debugErrorMessage != nil) \
+        selectedImageData=\(selectedImageData != nil) \
+        selectedImageSize=\(imageSizeDescription) \
+        isUsingCustomImage=\(isUsingCustomImage) \
+        aiInputAvailable=\(request.hasEnoughContent) \
+        debugInfoLoaded=\(debugInfo != nil)
+        """
+    }
+
+    func logPreviewDiagnostics(context: String) {
+        Self.logger.debug("\(self.previewDiagnosticsSnapshot(context: context), privacy: .public)")
     }
 }
