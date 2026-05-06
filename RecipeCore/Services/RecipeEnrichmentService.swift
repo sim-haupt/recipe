@@ -70,7 +70,10 @@ final class RecipeEnrichmentService: RecipeEnrichmentServicing {
         }
 
         let decoded = try JSONDecoder().decode(BackendRecipeEnrichmentResponse.self, from: data)
-        let extraction = decoded.asExtraction
+        let extraction = RecipeIngredientRecovery.selectBestExtraction(
+            decoded.asExtraction,
+            rawText: request.rawText
+        )
         guard extraction.hasMeaningfulContent else {
             throw RecipeEnrichmentError.invalidResponse
         }
@@ -199,4 +202,110 @@ private struct BackendRecipeEnrichmentDebugFetchedContext: Decodable {
     let fetchedTitle: String
     let fetchedDescription: String
     let fetchedText: String
+}
+
+enum RecipeIngredientRecovery {
+    static func selectBestExtraction(_ extraction: RecipeAIExtraction, rawText: String) -> RecipeAIExtraction {
+        let authoritativeIngredients = extractAuthoritativeIngredients(from: rawText)
+        guard !authoritativeIngredients.isEmpty else { return extraction }
+
+        let sourceStats = ingredientStats(for: authoritativeIngredients)
+        let extractionStats = ingredientStats(for: extraction.ingredients)
+
+        let sourceLooksStructured = sourceStats.itemCount >= 3
+            && sourceStats.amountCount >= max(2, Int(ceil(Double(sourceStats.itemCount) * 0.4)))
+        let extractionLostTooManyAmounts = extractionStats.amountCount < Int(ceil(Double(sourceStats.amountCount) * 0.7))
+        let extractionLostTooManyItems = extractionStats.itemCount < Int(ceil(Double(sourceStats.itemCount) * 0.85))
+
+        guard sourceLooksStructured && (extractionLostTooManyAmounts || extractionLostTooManyItems) else {
+            return extraction
+        }
+
+        var updated = extraction
+        updated.ingredients = authoritativeIngredients
+        return updated
+    }
+
+    static func extractAuthoritativeIngredients(from rawText: String) -> [String] {
+        let cleaned = ImportedTextSanitizer.normalizedRecipeExtractionText(from: rawText)
+        guard !cleaned.isEmpty else { return [] }
+
+        let lines = cleaned
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        guard let startIndex = lines.firstIndex(where: { isIngredientsHeader($0) }) else {
+            return []
+        }
+
+        let following = lines.dropFirst(startIndex + 1)
+        var result: [String] = []
+
+        for line in following {
+            if isSectionBreak(line) {
+                break
+            }
+
+            let cleanedLine = cleanedIngredientLine(line)
+            guard !cleanedLine.isEmpty else { continue }
+            result.append(cleanedLine)
+        }
+
+        return deduplicated(result)
+    }
+
+    private static func ingredientStats(for ingredients: [String]) -> (itemCount: Int, amountCount: Int) {
+        let itemLines = ingredients.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).hasSuffix(":") }
+        return (
+            itemCount: itemLines.count,
+            amountCount: itemLines.filter(lineHasExplicitAmount).count
+        )
+    }
+
+    private static func isIngredientsHeader(_ line: String) -> Bool {
+        let normalized = line.lowercased()
+        return normalized == "ingredients" || normalized == "ingredients:"
+            || normalized == "zutaten" || normalized == "zutaten:"
+            || normalized == "ingredient list" || normalized == "ingredient list:"
+            || normalized == "what you need" || normalized == "what you need:"
+    }
+
+    private static func isSectionBreak(_ line: String) -> Bool {
+        let normalized = line.lowercased()
+        let headers = [
+            "instructions", "instructions:", "directions", "directions:",
+            "method", "method:", "preparation", "preparation:",
+            "steps", "steps:", "how to make", "how to make:",
+            "notes", "notes:", "tips", "tips:"
+        ]
+        return headers.contains(normalized)
+    }
+
+    private static func cleanedIngredientLine(_ line: String) -> String {
+        line
+            .replacingOccurrences(of: #"^[-•]\s*"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: #"^\d+[\.\)]\s*"#, with: "", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func lineHasExplicitAmount(_ line: String) -> Bool {
+        let value = line.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return false }
+
+        let patterns = [
+            #"^(\d+\/\d+|\d+(?:[.,]\d+)?|¼|½|¾|⅓|⅔|⅛|⅜|⅝|⅞)\b"#,
+            #"\b(\d+\/\d+|\d+(?:[.,]\d+)?|¼|½|¾|⅓|⅔|⅛|⅜|⅝|⅞)\s*(g|kg|ml|l|tbsp|tsp|tablespoons?|teaspoons?|cups?|oz|lb|lbs|cans?|cloves?|pinch|el|tl)\b"#,
+            #"\b(zest and juice of|juice of|zest of)\s+\d+\b"#
+        ]
+
+        return patterns.contains { pattern in
+            value.range(of: pattern, options: [.regularExpression, .caseInsensitive]) != nil
+        }
+    }
+
+    private static func deduplicated(_ values: [String]) -> [String] {
+        var seen = Set<String>()
+        return values.filter { seen.insert($0.lowercased()).inserted }
+    }
 }
