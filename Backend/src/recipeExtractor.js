@@ -25,6 +25,7 @@ const SYSTEM_PROMPT = [
   "If the source is only in German, translate the ingredient lines into natural English while preserving amounts and measurements.",
   "Preserve every explicit quantity, unit, and measurement that appears in the source, such as grams, cups, tablespoons, teaspoons, cans, cloves, pinches, fractions, temperatures, and parenthetical amounts.",
   "Never drop an amount or unit from an ingredient line when the source provides one.",
+  "If the source contains a structured ingredients section, treat that section as authoritative for ingredient amounts and units.",
   "If an ingredient appears inside a sentence with its amount, extract it as a standalone ingredient line that still includes the full amount and unit.",
   "If one sentence contains multiple ingredients with their own amounts, split them into separate ingredient lines so each ingredient keeps its matching quantity.",
   "When the source says things like 'zest and juice of 1 lemon' or '2 tbsp tomato paste and 4 garlic cloves', preserve those ingredient quantities explicitly instead of shortening them.",
@@ -173,7 +174,10 @@ function normalizePayload(payload = {}) {
 }
 
 function normalizeExtraction(value = {}, request = {}) {
-  const ingredients = normalizeRecipeArray(value.ingredients, 40, 240);
+  const ingredients = reconcileIngredientAmounts(
+    normalizeRecipeArray(value.ingredients, 40, 240),
+    extractCandidateText(request)
+  );
   return {
     title: normalizeGeneratedTitle(value.title, request),
     summary: clampString(value.summary, 3000).replace(/\s+/g, " ").trim(),
@@ -256,6 +260,7 @@ function buildUserPrompt(payload) {
     "- If the same recipe is repeated in two languages, keep one normalized English set of ingredients.",
     "- If the source is only German, translate ingredients to English.",
     "- Preserve all explicit amounts, units, and measurements from the source. Do not omit quantities.",
+    "- If the source includes a structured ingredients section, copy the amounts and units from that section instead of paraphrasing them away.",
     "- If ingredients appear inline in instruction sentences, still extract them as ingredient lines with their full amounts and units.",
     "- If a sentence contains multiple ingredients with different amounts, split them into separate ingredient lines so each amount stays attached to the right ingredient.",
     "- Keep combined amount phrases intact, for example 'zest and juice of 1 lemon' or '2 tbsp tomato paste' and '4 garlic cloves'.",
@@ -577,6 +582,109 @@ function cleanRecipeLine(line) {
       .trim(),
     360
   );
+}
+
+function reconcileIngredientAmounts(ingredients, candidateText) {
+  if (!Array.isArray(ingredients) || ingredients.length === 0 || !candidateText) {
+    return ingredients;
+  }
+
+  const sourceLines = extractSourceIngredientLines(candidateText);
+  if (sourceLines.length === 0) {
+    return ingredients;
+  }
+
+  return ingredients.map((line) => {
+    if (!line || isSectionHeaderLine(line) || lineHasExplicitAmount(line)) {
+      return line;
+    }
+
+    const match = bestSourceIngredientMatch(line, sourceLines);
+    return match && lineHasExplicitAmount(match) ? match : line;
+  });
+}
+
+function extractSourceIngredientLines(candidateText) {
+  const normalized = normalizeRecipeCandidateText(candidateText);
+  const lines = normalized
+    .split(/\n+/)
+    .map(cleanRecipeLine)
+    .filter(Boolean);
+
+  const ingredientSection = sectionLines(
+    lines,
+    ["ingredients", "ingredient list", "what you need"],
+    ["instructions", "directions", "method", "preparation", "steps", "how to make", "notes", "tips"]
+  );
+
+  const structuredLines = ingredientSection.length > 0
+    ? ingredientSection.filter(isLikelyStructuredIngredientSourceLine)
+    : lines.filter(isLikelyStructuredIngredientSourceLine);
+
+  return dedupe(structuredLines).slice(0, 50);
+}
+
+function isLikelyStructuredIngredientSourceLine(line) {
+  if (!line || isSectionHeaderLine(line)) return false;
+  if (line.length > 180) return false;
+  if (/[.!?]\s*$/.test(line) && !lineHasExplicitAmount(line)) return false;
+  if (/^(add|mix|stir|cook|bake|fry|heat|whisk|combine|assemble|plate|serve)\b/i.test(line)) return false;
+  return looksLikeIngredientLine(line) || lineHasExplicitAmount(line);
+}
+
+function bestSourceIngredientMatch(line, sourceLines) {
+  const targetTokens = ingredientMeaningTokens(line);
+  if (targetTokens.length === 0) return "";
+
+  let bestLine = "";
+  let bestScore = 0;
+
+  for (const sourceLine of sourceLines) {
+    const sourceTokens = ingredientMeaningTokens(sourceLine);
+    if (sourceTokens.length === 0) continue;
+
+    const overlap = targetTokens.filter((token) => sourceTokens.includes(token)).length;
+    const score = overlap / Math.max(targetTokens.length, sourceTokens.length);
+
+    if (overlap >= Math.min(2, targetTokens.length) && score > bestScore) {
+      bestScore = score;
+      bestLine = sourceLine;
+    } else if (overlap === 1 && targetTokens.length === 1 && sourceTokens.length <= 4 && score > bestScore) {
+      bestScore = score;
+      bestLine = sourceLine;
+    }
+  }
+
+  return bestScore >= 0.34 ? bestLine : "";
+}
+
+function ingredientMeaningTokens(line) {
+  return (line || "")
+    .toLowerCase()
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/\b\d+(?:[.,/]\d+)?\b/g, " ")
+    .replace(/\b(one|two|three|four|five|six|seven|eight|nine|ten|half|quarter|pinch|small|medium|large|optional|to|taste)\b/g, " ")
+    .replace(/\b(g|kg|ml|l|tbsp|tsp|tablespoons?|teaspoons?|cups?|oz|lb|lbs|grams?|cans?|cloves?|el|tl)\b/g, " ")
+    .replace(/[^a-z\s]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean)
+    .filter((token) => token.length > 2)
+    .filter((token) => !["fresh", "dried", "firm", "soft", "raw", "extra", "virgin", "ground", "minced", "sliced", "diced", "chopped"].includes(token));
+}
+
+function isSectionHeaderLine(line) {
+  return /:\s*$/.test((line || "").trim());
+}
+
+function lineHasExplicitAmount(line) {
+  const value = (line || "").trim();
+  return /^[-•]?\s*(\d+\/\d+|\d+(?:[.,]\d+)?|¼|½|¾|⅓|⅔|⅛|⅜|⅝|⅞)\b/.test(value)
+    || /\b(\d+\/\d+|\d+(?:[.,]\d+)?|¼|½|¾|⅓|⅔|⅛|⅜|⅝|⅞)\s*(g|kg|ml|l|tbsp|tsp|tablespoons?|teaspoons?|cups?|oz|lb|lbs|cans?|cloves?|pinch|el|tl)\b/i.test(value)
+    || /\b(zest and juice of|juice of|zest of)\s+\d+\b/i.test(value);
+}
+
+export function reconcileIngredientAmountsForTesting(ingredients, candidateText) {
+  return reconcileIngredientAmounts(ingredients, candidateText);
 }
 
 function stripSocialLeadNoise(line) {

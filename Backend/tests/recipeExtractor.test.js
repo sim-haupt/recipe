@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { previewPayloadDiagnostics } from "../src/recipeExtractor.js";
+import { previewPayloadDiagnostics, reconcileIngredientAmountsForTesting } from "../src/recipeExtractor.js";
 
 test("webpage and instagram preview payloads normalize to the same safe contract", () => {
   const webpage = previewPayloadDiagnostics({
@@ -111,4 +111,44 @@ test("narrative recipe text keeps distinct component cues for gpt inference", ()
   assert.match(diagnostics.candidateText, /creamy lemony zesty sauce/i);
   assert.match(diagnostics.candidateText, /mayo/i);
   assert.match(diagnostics.candidateText, /regular rice/i);
+});
+
+test("reconciles missing amounts from structured ingredient source lines", () => {
+  const reconciled = reconcileIngredientAmountsForTesting(
+    [
+      "firm tofu, pat dried",
+      "cornstarch",
+      "soy sauce",
+      "white wine or balsamic vinegar"
+    ],
+    [
+      "Ingredients:",
+      "-400g firm tofu, pat dried",
+      "-2 Tbsp cornstarch",
+      "Sauce:",
+      "-4 Tbsp soy sauce",
+      "-2 Tbsp white wine or balsamic vinegar"
+    ].join("\n")
+  );
+
+  assert.deepEqual(reconciled, [
+    "400g firm tofu, pat dried",
+    "2 Tbsp cornstarch",
+    "Sauce:",
+    "4 Tbsp soy sauce",
+    "2 Tbsp white wine or balsamic vinegar"
+  ].filter((line) => !line.endsWith(":")));
+});
+
+test("does not replace instruction text while reconciling ingredient amounts", () => {
+  const reconciled = reconcileIngredientAmountsForTesting(
+    ["salt", "black pepper"],
+    [
+      "Instructions:",
+      "Add salt and black pepper to taste.",
+      "Mix well."
+    ].join("\n")
+  );
+
+  assert.deepEqual(reconciled, ["salt", "black pepper"]);
 });
