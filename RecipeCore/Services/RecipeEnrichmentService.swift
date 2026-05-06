@@ -235,24 +235,24 @@ enum RecipeIngredientRecovery {
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
 
-        guard let startIndex = lines.firstIndex(where: { isIngredientsHeader($0) }) else {
-            return []
-        }
+        if let startIndex = lines.firstIndex(where: { isIngredientsHeader($0) }) {
+            let following = lines.dropFirst(startIndex + 1)
+            var result: [String] = []
 
-        let following = lines.dropFirst(startIndex + 1)
-        var result: [String] = []
+            for line in following {
+                if isSectionBreak(line) {
+                    break
+                }
 
-        for line in following {
-            if isSectionBreak(line) {
-                break
+                let cleanedLine = cleanedIngredientLine(line)
+                guard !cleanedLine.isEmpty else { continue }
+                result.append(cleanedLine)
             }
 
-            let cleanedLine = cleanedIngredientLine(line)
-            guard !cleanedLine.isEmpty else { continue }
-            result.append(cleanedLine)
+            return deduplicated(result)
         }
 
-        return deduplicated(result)
+        return bestStructuredIngredientBlock(from: lines)
     }
 
     private static func ingredientStats(for ingredients: [String]) -> (itemCount: Int, amountCount: Int) {
@@ -287,6 +287,77 @@ enum RecipeIngredientRecovery {
             .replacingOccurrences(of: #"^[-•]\s*"#, with: "", options: .regularExpression)
             .replacingOccurrences(of: #"^\d+[\.\)]\s*"#, with: "", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func bestStructuredIngredientBlock(from lines: [String]) -> [String] {
+        var blocks: [[String]] = []
+        var current: [String] = []
+
+        func flushCurrentBlock() {
+            guard !current.isEmpty else { return }
+            blocks.append(current)
+            current = []
+        }
+
+        for rawLine in lines {
+            let line = cleanedIngredientLine(rawLine)
+            guard !line.isEmpty else {
+                flushCurrentBlock()
+                continue
+            }
+
+            if isSectionBreak(line) || looksLikeInstructionLine(line) {
+                flushCurrentBlock()
+                continue
+            }
+
+            if isPotentialIngredientLine(line) {
+                current.append(line)
+            } else {
+                flushCurrentBlock()
+            }
+        }
+
+        flushCurrentBlock()
+
+        let filteredBlocks = blocks.filter { block in
+            let stats = ingredientStats(for: block)
+            return stats.itemCount >= 3 && stats.amountCount >= 2
+        }
+
+        let bestBlock = filteredBlocks.max { lhs, rhs in
+            let leftStats = ingredientStats(for: lhs)
+            let rightStats = ingredientStats(for: rhs)
+            let leftScore = leftStats.amountCount * 3 + leftStats.itemCount
+            let rightScore = rightStats.amountCount * 3 + rightStats.itemCount
+            return leftScore < rightScore
+        } ?? []
+
+        return deduplicated(bestBlock)
+    }
+
+    private static func isPotentialIngredientLine(_ line: String) -> Bool {
+        guard !line.hasSuffix(":") else { return false }
+        guard line.count <= 180 else { return false }
+        if line.range(of: #"^(add|mix|stir|cook|bake|fry|heat|whisk|combine|assemble|plate|serve|drizzle|place|pop|turn|let|top|season)\b"#, options: [.regularExpression, .caseInsensitive]) != nil {
+            return false
+        }
+        if line.contains(". ") && !lineHasExplicitAmount(line) {
+            return false
+        }
+        return lineHasExplicitAmount(line) || !looksLikeInstructionLine(line)
+    }
+
+    private static func looksLikeInstructionLine(_ line: String) -> Bool {
+        let patterns = [
+            #"^(add|mix|stir|cook|bake|fry|heat|whisk|combine|assemble|plate|serve|drizzle|place|pop|turn|let|top|season)\b"#,
+            #"\b(until|for \d+|minutes?|hours?|overnight)\b"#,
+            #"[.!?]$"#
+        ]
+
+        return patterns.contains { pattern in
+            line.range(of: pattern, options: [.regularExpression, .caseInsensitive]) != nil
+        }
     }
 
     private static func lineHasExplicitAmount(_ line: String) -> Bool {

@@ -79,4 +79,64 @@ final class RecipeIngredientRecoveryTests: XCTestCase {
 
         XCTAssertEqual(recovered.ingredients, extraction.ingredients)
     }
+
+    func testSelectBestExtractionPrefersStructuredIngredientBlockWithoutHeader() {
+        let extraction = RecipeAIExtraction(
+            title: "Vodka Sauce Pasta",
+            summary: "Pasta in a creamy vodka tomato sauce.",
+            ingredients: [
+                "Vodka, 1/4 cup",
+                "Yellow onion",
+                "Garlic",
+                "Extra-virgin olive oil",
+                "Whole peeled tomatoes",
+                "Tomato paste",
+                "Crushed red pepper flakes",
+                "Heavy cream",
+                "Penne pasta",
+                "Reserved pasta cooking water, 1 cup",
+                "Reserved pasta cooking water, 1/2 cup (plus more as needed)",
+                "Fresh basil and/or parsley",
+                "Parmesan cheese",
+                "Salt",
+                "Black pepper"
+            ],
+            confidence: 0.9
+        )
+
+        let rawText = """
+        2 tablespoons extra-virgin olive oil
+        1/2 medium yellow onion, chopped
+        3 garlic cloves, thinly sliced
+        1/2 teaspoon sea salt
+        Freshly ground black pepper
+        1/2 teaspoon red pepper flakes
+        1 (6-ounce) can tomato paste
+        1/4 cup vodka, see note*
+        1 (14-ounce) can whole peeled tomatoes, crushed
+        1 pound tube-shaped pasta, such as penne or rigatoni
+        1/2 cup heavy cream
+        Chopped fresh parsley or fresh basil leaves, for garnish
+        Freshly grated Parmesan cheese, for serving
+        Bring a large pot of salted water to a boil.
+        """
+
+        let recovered = RecipeIngredientRecovery.selectBestExtraction(extraction, rawText: rawText)
+
+        XCTAssertEqual(recovered.ingredients, [
+            "2 tablespoons extra-virgin olive oil",
+            "1/2 medium yellow onion, chopped",
+            "3 garlic cloves, thinly sliced",
+            "1/2 teaspoon sea salt",
+            "Freshly ground black pepper",
+            "1/2 teaspoon red pepper flakes",
+            "1 (6-ounce) can tomato paste",
+            "1/4 cup vodka, see note*",
+            "1 (14-ounce) can whole peeled tomatoes, crushed",
+            "1 pound tube-shaped pasta, such as penne or rigatoni",
+            "1/2 cup heavy cream",
+            "Chopped fresh parsley or fresh basil leaves, for garnish",
+            "Freshly grated Parmesan cheese, for serving"
+        ])
+    }
 }
