@@ -204,6 +204,23 @@ private struct AddRecipePreviewEditorView: View {
                     .foregroundStyle(RecipeTheme.textPrimary)
 
                 Spacer()
+
+                Button {
+                    isShowingDebugInspector = true
+                    Task {
+                        await viewModel.loadDebugInfo()
+                    }
+                } label: {
+                    Label("Inspect AI Input", systemImage: "sparkles.rectangle.stack")
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .foregroundStyle(RecipeTheme.accentStrong)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(Color.white.opacity(0.92))
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .disabled(viewModel.isLoadingDebugInfo)
             }
 
             HStack(spacing: 12) {

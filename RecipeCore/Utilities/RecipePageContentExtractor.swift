@@ -68,7 +68,8 @@ enum RecipePageContentExtractor {
         let ingredientSection = sectionLines(
             from: lines,
             matchingHeaders: ["ingredients", "ingredient list", "what you need"],
-            untilHeaders: ["instructions", "directions", "method", "preparation", "steps", "how to make", "notes", "tips"]
+            untilHeaders: ["instructions", "directions", "method", "preparation", "steps", "how to make", "notes", "tips"],
+            preferQuantified: true
         )
 
         let preparationSection = sectionLines(
@@ -107,14 +108,26 @@ enum RecipePageContentExtractor {
         return deduplicated(result).prefix(90).map { $0 }
     }
 
-    private static func sectionLines(from lines: [String], matchingHeaders headers: [String], untilHeaders endHeaders: [String]) -> [String] {
-        guard let startIndex = lines.firstIndex(where: { line in
-            let normalized = line.lowercased()
+    private static func sectionLines(from lines: [String], matchingHeaders headers: [String], untilHeaders endHeaders: [String], preferQuantified: Bool = false) -> [String] {
+        let startIndexes = lines.indices.filter { index in
+            let normalized = lines[index].lowercased()
             return headers.contains(where: { normalized == $0 || normalized.hasPrefix($0 + ":") })
-        }) else {
-            return []
         }
 
+        guard !startIndexes.isEmpty else { return [] }
+
+        let candidates = startIndexes.map { startIndex in
+            sectionCandidate(from: lines, startIndex: startIndex, untilHeaders: endHeaders)
+        }
+
+        if preferQuantified {
+            return candidates.max(by: { score(sectionCandidate: $0) < score(sectionCandidate: $1) }) ?? []
+        }
+
+        return candidates.first ?? []
+    }
+
+    private static func sectionCandidate(from lines: [String], startIndex: Int, untilHeaders endHeaders: [String]) -> [String] {
         let remaining = Array(lines.dropFirst(startIndex + 1))
         let endIndex = remaining.firstIndex(where: { line in
             let normalized = line.lowercased()
@@ -126,6 +139,32 @@ enum RecipePageContentExtractor {
             .filter { isUsefulContentLine($0) }
             .prefix(30)
             .map { $0 }
+    }
+
+    private static func score(sectionCandidate lines: [String]) -> Int {
+        let amountCount = lines.filter(lineHasExplicitAmount).count
+        let shortLineCount = lines.filter { $0.count <= 90 }.count
+        let prosePenalty = lines.filter(looksLikeProseExplanation).count
+        return (amountCount * 5) + shortLineCount - (prosePenalty * 3)
+    }
+
+    private static func lineHasExplicitAmount(_ line: String) -> Bool {
+        let patterns = [
+            #"^[-•]?\s*(\d+\/\d+|\d+(?:[.,]\d+)?|¼|½|¾|⅓|⅔|⅛|⅜|⅝|⅞)\b"#,
+            #"\b(\d+\/\d+|\d+(?:[.,]\d+)?|¼|½|¾|⅓|⅔|⅛|⅜|⅝|⅞)\s*(g|kg|ml|l|tbsp|tsp|tablespoons?|teaspoons?|cups?|oz|lb|lbs|cans?|cloves?|pinch)\b"#,
+            #"\b(one|two|three|four|five|six|seven|eight|nine|ten)\s+(pound|cup|cups|tablespoons?|teaspoons?|cloves?|cans?)\b"#
+        ]
+
+        return patterns.contains { pattern in
+            line.range(of: pattern, options: [.regularExpression, .caseInsensitive]) != nil
+        }
+    }
+
+    private static func looksLikeProseExplanation(_ line: String) -> Bool {
+        line.contains(" – ")
+            || line.contains(" - ")
+            || line.contains(". ")
+            || line.range(of: #"\b(they|it|this|these|that|feel free|for serving|for garnish)\b"#, options: [.regularExpression, .caseInsensitive]) != nil
     }
 
     private static func isUsefulContentLine(_ line: String) -> Bool {
