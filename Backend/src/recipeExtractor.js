@@ -174,10 +174,12 @@ function normalizePayload(payload = {}) {
 }
 
 function normalizeExtraction(value = {}, request = {}) {
-  const ingredients = reconcileIngredientAmounts(
+  const candidateText = extractCandidateText(request);
+  const normalizedIngredients = reconcileIngredientAmounts(
     normalizeRecipeArray(value.ingredients, 40, 240),
-    extractCandidateText(request)
+    candidateText
   );
+  const ingredients = selectBestIngredientResult(normalizedIngredients, candidateText);
   return {
     title: normalizeGeneratedTitle(value.title, request),
     summary: clampString(value.summary, 3000).replace(/\s+/g, " ").trim(),
@@ -685,6 +687,62 @@ function lineHasExplicitAmount(line) {
 
 export function reconcileIngredientAmountsForTesting(ingredients, candidateText) {
   return reconcileIngredientAmounts(ingredients, candidateText);
+}
+
+export function selectBestIngredientResultForTesting(ingredients, candidateText) {
+  return selectBestIngredientResult(ingredients, candidateText);
+}
+
+function selectBestIngredientResult(ingredients, candidateText) {
+  const sourceIngredients = extractAuthoritativeIngredientSection(candidateText);
+  if (sourceIngredients.length === 0) {
+    return ingredients;
+  }
+
+  const sourceStats = ingredientStats(sourceIngredients);
+  const resultStats = ingredientStats(ingredients);
+
+  const sourceLooksStructured = sourceStats.itemCount >= 3 && sourceStats.amountCount >= Math.max(2, Math.ceil(sourceStats.itemCount * 0.4));
+  const resultLostTooManyAmounts = resultStats.amountCount < Math.ceil(sourceStats.amountCount * 0.7);
+  const resultLostTooManyItems = resultStats.itemCount < Math.ceil(sourceStats.itemCount * 0.85);
+
+  if (sourceLooksStructured && (resultLostTooManyAmounts || resultLostTooManyItems)) {
+    return sourceIngredients;
+  }
+
+  return ingredients;
+}
+
+function extractAuthoritativeIngredientSection(candidateText) {
+  if (!candidateText) return [];
+
+  const normalized = normalizeRecipeCandidateText(candidateText);
+  const rawLines = normalized
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const ingredientSection = sectionLines(
+    rawLines,
+    ["ingredients", "ingredient list", "what you need"],
+    ["instructions", "directions", "method", "preparation", "steps", "how to make", "notes", "tips"]
+  );
+
+  return dedupe(
+    ingredientSection
+      .map(cleanRecipeLine)
+      .filter(Boolean)
+      .filter((line) => !isSectionHeaderLine(line))
+      .filter((line) => !/^(recipe|rezept)\b/i.test(line))
+  ).slice(0, 50);
+}
+
+function ingredientStats(lines) {
+  const itemLines = (lines || []).filter((line) => line && !isSectionHeaderLine(line));
+  return {
+    itemCount: itemLines.length,
+    amountCount: itemLines.filter(lineHasExplicitAmount).length
+  };
 }
 
 function stripSocialLeadNoise(line) {

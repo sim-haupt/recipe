@@ -105,13 +105,13 @@ households/{householdId}/recipes/{recipeId}.jpg
 At minimum, production rules should ensure:
 
 - A user can read/write only their own `users/{userId}` document.
-- A user can read a cooking book only if their UID is in `memberIDs`.
-- A user can read/write recipes, comments, reviews, and tags only within cooking books they belong to.
+- A user can read a cookbook only if their UID is in `memberIDs`.
+- A user can read/write recipes, comments, reviews, and tags only within cookbooks they belong to.
 - A user can write only their own review document at `reviews/{userId}`.
 
 ## Why this shape
 
 - Cooking-book-level subcollections make it easy to subscribe to a shared recipe set.
-- Tags live per cooking book so filters stay collaborative.
+- Tags live per cookbook so filters stay collaborative.
 - Denormalized `tagNames`, `averageRating`, and `reviewCount` keep the home screen fast.
 - Comments and reviews remain queryable and independently attributable to users.

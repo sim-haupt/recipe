@@ -161,7 +161,7 @@ final class DemoHouseholdService: HouseholdServicing {
 
     func joinHousehold(inviteCode: String, user: UserProfile) async throws -> Household {
         guard let household = store.households.values.first(where: { $0.inviteCode.caseInsensitiveCompare(inviteCode) == .orderedSame }) else {
-            throw NSError(domain: "WeCookinDemo", code: 404, userInfo: [NSLocalizedDescriptionKey: "No demo cooking book matches that invite code."])
+            throw NSError(domain: "WeCookinDemo", code: 404, userInfo: [NSLocalizedDescriptionKey: "No demo cookbook matches that invite code."])
         }
 
         var updatedHousehold = household

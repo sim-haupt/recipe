@@ -113,9 +113,9 @@ struct HouseholdSettingsView: View {
     }
 
     private var createHouseholdCard: some View {
-        settingsCard(title: "Create Cooking Book") {
+        settingsCard(title: "Create Cookbook") {
             VStack(alignment: .leading, spacing: 14) {
-                TextField("Cooking book name", text: $viewModel.newHouseholdName)
+                TextField("Cookbook name", text: $viewModel.newHouseholdName)
                     .recipeSettingsInputStyle(borderColor: Color.black.opacity(0.10), lineWidth: 1.4)
 
                 Button {
@@ -124,7 +124,7 @@ struct HouseholdSettingsView: View {
                         await sessionViewModel.refreshUserProfile()
                     }
                 } label: {
-                    Text(viewModel.isCreatingHousehold ? "Creating..." : "Create Cooking Book")
+                    Text(viewModel.isCreatingHousehold ? "Creating..." : "Create Cookbook")
                         .font(.system(size: 15, weight: .bold, design: .rounded))
                         .foregroundStyle(RecipeTheme.textOnAccent)
                         .frame(maxWidth: .infinity)
@@ -141,12 +141,12 @@ struct HouseholdSettingsView: View {
     }
 
     private var householdListCard: some View {
-        settingsCard(title: "My Cooking Books") {
+        settingsCard(title: "My Cookbooks") {
             VStack(alignment: .leading, spacing: 12) {
                 if viewModel.isLoading {
-                    ProgressView("Loading cooking books…")
+                    ProgressView("Loading cookbooks…")
                 } else if viewModel.households.isEmpty {
-                    Text("Create your first cooking book to start sharing recipes.")
+                    Text("Create your first cookbook to start sharing recipes.")
                         .font(.system(size: 14, weight: .medium, design: .rounded))
                         .foregroundStyle(RecipeTheme.textSecondary)
                 } else {
@@ -166,7 +166,7 @@ struct HouseholdSettingsView: View {
                                                 .font(.system(size: 15, weight: .bold, design: .rounded))
                                                 .foregroundStyle(RecipeTheme.textPrimary)
 
-                                            Text(isActive ? "Active cooking book" : "Tap to make active")
+                                            Text(isActive ? "Active cookbook" : "Tap to make active")
                                                 .font(.system(size: 13, weight: .medium, design: .rounded))
                                                 .foregroundStyle(isActive ? RecipeTheme.accentStrong : RecipeTheme.textSecondary)
                                         }
@@ -199,8 +199,8 @@ struct HouseholdSettingsView: View {
                                 if let inviteURL = URL(string: viewModel.shareLink(for: household)) {
                                     ShareLink(
                                         item: inviteURL,
-                                        subject: Text("Join my WeCookin' cooking book"),
-                                        message: Text("Join my WeCookin' cooking book \"\(household.name)\" using this link.")
+                                        subject: Text("Join my WeCookin' cookbook"),
+                                        message: Text("Join my WeCookin' cookbook \"\(household.name)\" using this link.")
                                     ) {
                                         Image(systemName: "square.and.arrow.up")
                                             .font(.system(size: 16, weight: .semibold))

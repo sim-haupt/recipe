@@ -18,10 +18,10 @@ struct HouseholdOnboardingView: View {
                     Text("Set up your shared kitchen")
                         .font(.system(size: 32, weight: .bold, design: .rounded))
 
-                    groupedCard(title: "Create a cooking book") {
-                        TextField("Cooking book name", text: $viewModel.householdName)
+                    groupedCard(title: "Create a cookbook") {
+                        TextField("Cookbook name", text: $viewModel.householdName)
                             .textFieldStyle(.roundedBorder)
-                        Button("Create Cooking Book") {
+                        Button("Create Cookbook") {
                             Task {
                                 await viewModel.createHousehold(for: userProfile)
                                 await sessionViewModel.refreshUserProfile()
@@ -35,7 +35,7 @@ struct HouseholdOnboardingView: View {
                         TextField("Invite code", text: $viewModel.inviteCode)
                             .textInputAutocapitalization(.characters)
                             .textFieldStyle(.roundedBorder)
-                        Button("Join Cooking Book") {
+                        Button("Join Cookbook") {
                             Task {
                                 await viewModel.joinHousehold(for: userProfile)
                                 await sessionViewModel.refreshUserProfile()
@@ -48,7 +48,7 @@ struct HouseholdOnboardingView: View {
                 .padding(24)
             }
             .background(RecipeTheme.pageGradient.ignoresSafeArea())
-            .alert("Cooking book setup issue", isPresented: Binding(
+            .alert("Cookbook setup issue", isPresented: Binding(
                 get: { viewModel.errorMessage != nil },
                 set: { if !$0 { viewModel.errorMessage = nil } }
             )) {

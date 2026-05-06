@@ -117,7 +117,7 @@ final class AddRecipeViewModel: ObservableObject {
 
     func save() async -> Bool {
         guard let householdID = userProfile.activeHouseholdID else {
-            errorMessage = "Choose a cooking book before saving recipes."
+            errorMessage = "Choose a cookbook before saving recipes."
             return false
         }
 

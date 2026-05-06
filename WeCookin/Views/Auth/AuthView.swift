@@ -15,13 +15,13 @@ struct AuthView: View {
                         Text("WeCookin'")
                             .font(.system(size: 38, weight: .bold, design: .rounded))
 
-                        Text("Sign in with Apple to create or join a shared cooking book. Everyone in the cooking book can add, edit, and save recipes together in real time.")
+                        Text("Sign in with Apple to create or join a shared cookbook. Everyone in the cookbook can add, edit, and save recipes together in real time.")
                             .font(.system(size: 15, weight: .medium, design: .rounded))
                             .foregroundStyle(.secondary)
                     }
 
                     VStack(alignment: .leading, spacing: 12) {
-                        featureRow(icon: "person.2.fill", text: "Share the same recipe collection with your cooking book.")
+                        featureRow(icon: "person.2.fill", text: "Share the same recipe collection with your cookbook.")
                         featureRow(icon: "square.and.pencil", text: "Everyone can add, edit, and organize recipes.")
                         featureRow(icon: "person.badge.key.fill", text: "Sign in securely with your Apple ID.")
                     }
@@ -66,8 +66,8 @@ struct AuthView: View {
                     }
 
                     Text(environment.mode == .firebase
-                         ? "After signing in, you can create a cooking book or join one with an invite code."
-                         : "Demo mode signs you into the shared sample cooking book automatically.")
+                         ? "After signing in, you can create a cookbook or join one with an invite code."
+                         : "Demo mode signs you into the shared sample cookbook automatically.")
                         .font(.system(size: 13, weight: .medium, design: .rounded))
                         .foregroundStyle(.secondary)
 

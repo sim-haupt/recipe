@@ -29,7 +29,7 @@ final class HouseholdSettingsViewModel: ObservableObject {
     }
 
     var activeHouseholdName: String {
-        activeHousehold?.name.isEmpty == false ? activeHousehold!.name : "Shared Cooking Book"
+        activeHousehold?.name.isEmpty == false ? activeHousehold!.name : "Shared Cookbook"
     }
 
     func shareLink(for household: Household) -> String {
@@ -39,7 +39,7 @@ final class HouseholdSettingsViewModel: ObservableObject {
 
     func inviteMessage(for household: Household) -> String {
         """
-        Join my WeCookin' cooking book "\(household.name)".
+        Join my WeCookin' cookbook "\(household.name)".
 
         Open this link on your iPhone:
         \(shareLink(for: household))

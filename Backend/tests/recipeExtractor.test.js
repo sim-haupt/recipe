@@ -1,7 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { previewPayloadDiagnostics, reconcileIngredientAmountsForTesting } from "../src/recipeExtractor.js";
+import {
+  previewPayloadDiagnostics,
+  reconcileIngredientAmountsForTesting,
+  selectBestIngredientResultForTesting
+} from "../src/recipeExtractor.js";
 
 test("webpage and instagram preview payloads normalize to the same safe contract", () => {
   const webpage = previewPayloadDiagnostics({
@@ -151,4 +155,60 @@ test("does not replace instruction text while reconciling ingredient amounts", (
   );
 
   assert.deepEqual(reconciled, ["salt", "black pepper"]);
+});
+
+test("prefers structured source ingredient section when gpt drops too many amounts", () => {
+  const selected = selectBestIngredientResultForTesting(
+    [
+      "Sauce:",
+      "1/4 cup vodka",
+      "Yellow onion",
+      "Garlic",
+      "Extra-virgin olive oil",
+      "Whole peeled tomatoes",
+      "Tomato paste",
+      "Crushed red pepper flakes",
+      "Heavy cream",
+      "Salt",
+      "Black pepper",
+      "Pasta:",
+      "Penne pasta",
+      "1 cup reserved starchy pasta cooking water",
+      "To serve:",
+      "Fresh basil and/or parsley",
+      "Parmesan cheese"
+    ],
+    [
+      "Ingredients:",
+      "2 tablespoons extra-virgin olive oil",
+      "1/2 medium yellow onion, chopped",
+      "3 garlic cloves, thinly sliced",
+      "1/2 teaspoon sea salt",
+      "Freshly ground black pepper",
+      "1/2 teaspoon red pepper flakes",
+      "1 (6-ounce) can tomato paste",
+      "1/4 cup vodka",
+      "1 (14-ounce) can whole peeled tomatoes, crushed",
+      "1 pound tube-shaped pasta, such as penne or rigatoni",
+      "1/2 cup heavy cream",
+      "Chopped fresh parsley or fresh basil leaves, for garnish",
+      "Freshly grated Parmesan cheese, for serving"
+    ].join("\n")
+  );
+
+  assert.deepEqual(selected, [
+    "2 tablespoons extra-virgin olive oil",
+    "1/2 medium yellow onion, chopped",
+    "3 garlic cloves, thinly sliced",
+    "1/2 teaspoon sea salt",
+    "Freshly ground black pepper",
+    "1/2 teaspoon red pepper flakes",
+    "1 (6-ounce) can tomato paste",
+    "1/4 cup vodka",
+    "1 (14-ounce) can whole peeled tomatoes, crushed",
+    "1 pound tube-shaped pasta, such as penne or rigatoni",
+    "1/2 cup heavy cream",
+    "Chopped fresh parsley or fresh basil leaves, for garnish",
+    "Freshly grated Parmesan cheese, for serving"
+  ]);
 });

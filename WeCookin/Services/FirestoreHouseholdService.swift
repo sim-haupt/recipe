@@ -137,7 +137,7 @@ final class FirestoreHouseholdService: HouseholdServicing {
             .getDocuments()
 
         guard let document = snapshot.documents.first, let household = mapHousehold(document) else {
-            throw NSError(domain: "WeCookin", code: 404, userInfo: [NSLocalizedDescriptionKey: "No cooking book matches that invite code."])
+            throw NSError(domain: "WeCookin", code: 404, userInfo: [NSLocalizedDescriptionKey: "No cookbook matches that invite code."])
         }
 
         try await document.reference.setData([
@@ -161,7 +161,7 @@ final class FirestoreHouseholdService: HouseholdServicing {
         ], merge: true)
 
         guard let updated = try await loadUserProfile(userID: userID) else {
-            throw NSError(domain: "WeCookin", code: 500, userInfo: [NSLocalizedDescriptionKey: "Could not reload the updated cooking book selection."])
+            throw NSError(domain: "WeCookin", code: 500, userInfo: [NSLocalizedDescriptionKey: "Could not reload the updated cookbook selection."])
         }
         return updated
     }
@@ -194,7 +194,7 @@ func mapHousehold(_ document: DocumentSnapshot) -> Household? {
     guard let data = document.data() else { return nil }
     return Household(
         id: document.documentID,
-        name: data["name"] as? String ?? "Cooking Book",
+        name: data["name"] as? String ?? "Cookbook",
         inviteCode: data["inviteCode"] as? String ?? "",
         memberIDs: data["memberIDs"] as? [String] ?? [],
         createdByUserID: data["createdByUserID"] as? String ?? "",

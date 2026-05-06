@@ -1,11 +1,11 @@
 # WeCookin
 
-WeCookin is a SwiftUI iPhone app for saving recipes from websites, Instagram posts, and other apps through the iOS Share Sheet. This starter focuses on an MVP with Firebase Authentication, Cloud Firestore, a shared cooking book model, and a Share Extension that saves import drafts into an App Group for the main app to ingest.
+WeCookin is a SwiftUI iPhone app for saving recipes from websites, Instagram posts, and other apps through the iOS Share Sheet. This starter focuses on an MVP with Firebase Authentication, Cloud Firestore, a shared cookbook model, and a Share Extension that saves import drafts into an App Group for the main app to ingest.
 
 ## What is included
 
 - SwiftUI app shell with Sign in with Apple
-- Cooking book creation and invite-code join flow
+- Cookbook creation and invite-code join flow
 - Home screen with search, tag filters, and recipe cards
 - Manual recipe creation flow with tags, notes, rating, and optional image
 - Recipe detail screen with tag editing, comments, reviews, and external sharing
@@ -40,7 +40,7 @@ WeCookin/
 - `RecipeCore` contains shared models and share-import storage used by both targets.
 - `WeCookin` contains the SwiftUI app, view models, theme, and Firebase-backed services.
 - `ShareExtension` contains the UIKit host controller and SwiftUI import flow for the Share Extension.
-- Firestore is the source of truth for cooking books, recipes, comments, reviews, and tags.
+- Firestore is the source of truth for cookbooks, recipes, comments, reviews, and tags.
 - The Share Extension saves a `RecipeDraft` into the shared App Group container. The main app imports those pending drafts into Firestore when the home screen starts.
 
 ## Setup
@@ -135,16 +135,16 @@ and returns:
 
 ## MVP assumptions
 
-- One active cooking book per user is supported in the UI, even though the data model supports multiple memberships.
-- Recipes are stored under a cooking book subcollection in Firestore.
+- One active cookbook per user is supported in the UI, even though the data model supports multiple memberships.
+- Recipes are stored under a cookbook subcollection in Firestore.
 - Ratings are 1 through 5 stars.
-- Comments and reviews are separate records so cooking books can keep lightweight discussion and rating history.
+- Comments and reviews are separate records so cookbooks can keep lightweight discussion and rating history.
 - Share imports are finalized by the main app after extension save, rather than writing directly to Firestore from the extension.
 
 ## Recommended next steps
 
-- Add a proper invite screen showing the current cooking book code inside the home view.
+- Add a proper invite screen showing the current cookbook code inside the home view.
 - Add HTML/Open Graph parsing for web URLs fetched inside the main app after import.
 - Add offline caching and optimistic local persistence.
-- Add edit/delete recipe flows and cooking book switching.
+- Add edit/delete recipe flows and cookbook switching.
 - Add image resizing and duplicate detection for imports.
