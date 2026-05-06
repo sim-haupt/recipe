@@ -22,7 +22,8 @@ final class AddRecipeViewModelTests: XCTestCase {
                 extraction: RecipeAIExtraction(title: "Quick Chickpea Sandwich", summary: "A quick chickpea sandwich.", ingredients: ["1 onion", "2 cans chickpeas", "100g vegan mayo"], confidence: 0.8)
             ),
             sharedDraftStore: SharedDraftStore(),
-            mode: .demo
+            mode: .demo,
+            configurationIssue: nil
         )
 
         let user = UserProfile(

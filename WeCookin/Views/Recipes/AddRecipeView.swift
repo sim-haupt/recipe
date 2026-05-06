@@ -1,7 +1,6 @@
 import PhotosUI
 import SwiftUI
 import UIKit
-import os
 
 struct AddRecipeView: View {
     @Environment(\.appEnvironment) private var environment
@@ -147,8 +146,6 @@ struct AddRecipeView: View {
 }
 
 private struct AddRecipePreviewEditorView: View {
-    private static let logger = Logger(subsystem: "WeCookin", category: "AddRecipePreview")
-
     @ObservedObject var viewModel: AddRecipeViewModel
     let onBack: () -> Void
     let onSave: () async -> Void
@@ -167,11 +164,6 @@ private struct AddRecipePreviewEditorView: View {
             .padding(.top, 18)
             .padding(.bottom, 28)
         }
-        .simultaneousGesture(
-            TapGesture().onEnded {
-                Self.logger.debug("Preview root received tap for source: \(self.viewModel.draft.sourceURL, privacy: .public)")
-            }
-        )
         .background(RecipeTheme.pageGradient.ignoresSafeArea())
         .navigationTitle("Recipe Preview")
         .navigationBarTitleDisplayMode(.inline)
@@ -201,15 +193,6 @@ private struct AddRecipePreviewEditorView: View {
                 let loadedData = try? await newValue.loadTransferable(type: Data.self)
                 viewModel.setCustomSelectedImageData(loadedData)
             }
-        }
-        .onChange(of: isPresentingImagePicker) { _, isPresented in
-            Self.logger.debug("Change Image picker state changed: \(isPresented)")
-        }
-        .onChange(of: isShowingDebugInspector) { _, isPresented in
-            Self.logger.debug("Inspect AI Input sheet state changed: \(isPresented)")
-        }
-        .task {
-            viewModel.logPreviewDiagnostics(context: "AddRecipePreviewEditorView.task")
         }
     }
 
@@ -254,10 +237,12 @@ private struct AddRecipePreviewEditorView: View {
                 .allowsHitTesting(false)
         }
         .shadow(color: RecipeTheme.shadow.opacity(0.55), radius: 10, y: 6)
-        .modifier(FrameLoggingModifier(name: "previewSourceCard", logger: Self.logger))
         .simultaneousGesture(
-            TapGesture().onEnded {
-                Self.logger.debug("Preview source card received tap")
+            LongPressGesture(minimumDuration: 1.2).onEnded { _ in
+                isShowingDebugInspector = true
+                Task {
+                    await viewModel.loadDebugInfo()
+                }
             }
         )
     }
@@ -337,7 +322,6 @@ private struct AddRecipePreviewEditorView: View {
                 .allowsHitTesting(false)
         }
         .shadow(color: RecipeTheme.shadow.opacity(0.55), radius: 10, y: 6)
-        .modifier(FrameLoggingModifier(name: "generatedPreviewCard", logger: Self.logger))
     }
 
     @ViewBuilder
@@ -359,22 +343,13 @@ private struct AddRecipePreviewEditorView: View {
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .overlay(alignment: .bottomLeading) {
             Button {
-                Self.logger.debug("Change Image tapped for source: \(self.viewModel.draft.sourceURL)")
-                self.viewModel.logPreviewDiagnostics(context: "ChangeImage.tap")
                 isPresentingImagePicker = true
             } label: {
                 changeImageLabel
             }
             .buttonStyle(.plain)
-            .modifier(FrameLoggingModifier(name: "changeImageButton", logger: Self.logger))
             .padding(12)
         }
-        .modifier(FrameLoggingModifier(name: "previewImage", logger: Self.logger))
-        .simultaneousGesture(
-            TapGesture().onEnded {
-                Self.logger.debug("Preview image container received tap")
-            }
-        )
     }
 
     private func inputSection<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
@@ -385,29 +360,6 @@ private struct AddRecipePreviewEditorView: View {
 
             content()
         }
-    }
-
-    private var inspectAIButton: some View {
-        Button {
-            Self.logger.debug("Inspect AI Input tapped for source: \(self.viewModel.draft.sourceURL)")
-            self.viewModel.logPreviewDiagnostics(context: "InspectAIButton.tap")
-            isShowingDebugInspector = true
-            Task {
-                await viewModel.loadDebugInfo()
-            }
-        } label: {
-            Label(viewModel.isLoadingDebugInfo ? "Inspecting…" : "Inspect AI Input", systemImage: "ladybug")
-                .font(.system(size: 12, weight: .bold, design: .rounded))
-                .foregroundStyle(RecipeTheme.textOnAccent)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 9)
-                .background(RecipeTheme.accentStrong)
-                .clipShape(Capsule())
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .disabled(viewModel.isLoadingDebugInfo)
-        .modifier(FrameLoggingModifier(name: "inspectAIButton", logger: Self.logger))
     }
 
     private var changeImageLabel: some View {
@@ -475,9 +427,9 @@ private struct AddRecipePreviewEditorView: View {
                         }
                     }
                     .disabled(viewModel.isLoadingDebugInfo)
-                }
             }
-        }
+    }
+}
     }
 
     private func debugField(title: String, value: String, isCode: Bool = false) -> some View {
@@ -591,27 +543,6 @@ private enum AddRecipeIngredientFormatting {
         guard !trimmed.isEmpty else { return false }
         if trimmed.hasPrefix("-") || trimmed.hasPrefix("•") { return false }
         return trimmed.hasSuffix(":")
-    }
-}
-
-private struct FrameLoggingModifier: ViewModifier {
-    let name: String
-    let logger: Logger
-
-    func body(content: Content) -> some View {
-        content.background(
-            GeometryReader { proxy in
-                Color.clear
-                    .task(id: frameSignature(proxy.frame(in: .global))) {
-                        let frame = proxy.frame(in: .global)
-                        logger.debug("\(self.name, privacy: .public) frame x=\(frame.origin.x) y=\(frame.origin.y) w=\(frame.size.width) h=\(frame.size.height)")
-                    }
-            }
-        )
-    }
-
-    private func frameSignature(_ frame: CGRect) -> String {
-        "\(frame.origin.x.rounded())-\(frame.origin.y.rounded())-\(frame.size.width.rounded())-\(frame.size.height.rounded())"
     }
 }
 

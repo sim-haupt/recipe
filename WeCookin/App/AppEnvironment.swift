@@ -8,10 +8,32 @@ struct AppEnvironment {
     let recipeEnrichmentService: RecipeEnrichmentServicing
     let sharedDraftStore: SharedDraftStore
     let mode: AppMode
+    let configurationIssue: String?
 
     enum AppMode {
         case firebase
         case demo
+        case misconfigured
+    }
+
+    init(
+        authService: AuthServicing,
+        householdService: HouseholdServicing,
+        recipeService: RecipeServicing,
+        urlImportService: RecipeURLImportServicing,
+        recipeEnrichmentService: RecipeEnrichmentServicing,
+        sharedDraftStore: SharedDraftStore,
+        mode: AppMode,
+        configurationIssue: String? = nil
+    ) {
+        self.authService = authService
+        self.householdService = householdService
+        self.recipeService = recipeService
+        self.urlImportService = urlImportService
+        self.recipeEnrichmentService = recipeEnrichmentService
+        self.sharedDraftStore = sharedDraftStore
+        self.mode = mode
+        self.configurationIssue = configurationIssue
     }
 
     static let live = AppEnvironment(
@@ -21,7 +43,8 @@ struct AppEnvironment {
         urlImportService: RecipeURLImportService(),
         recipeEnrichmentService: RecipeEnrichmentService(),
         sharedDraftStore: SharedDraftStore(),
-        mode: .firebase
+        mode: .firebase,
+        configurationIssue: nil
     )
 
     static let demo = AppEnvironment(
@@ -31,6 +54,20 @@ struct AppEnvironment {
         urlImportService: RecipeURLImportService(),
         recipeEnrichmentService: RecipeEnrichmentService(),
         sharedDraftStore: SharedDraftStore(),
-        mode: .demo
+        mode: .demo,
+        configurationIssue: nil
     )
+
+    static func misconfigured(message: String) -> AppEnvironment {
+        AppEnvironment(
+            authService: DemoAuthService(),
+            householdService: DemoHouseholdService(),
+            recipeService: DemoRecipeService(),
+            urlImportService: RecipeURLImportService(),
+            recipeEnrichmentService: RecipeEnrichmentService(),
+            sharedDraftStore: SharedDraftStore(),
+            mode: .misconfigured,
+            configurationIssue: message
+        )
+    }
 }

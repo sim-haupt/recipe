@@ -20,6 +20,8 @@
 	<string>1</string>
 	<key>RecipeEnrichmentAPIURL</key>
 	<string>https://recipe-production-1737.up.railway.app/api/recipe-extract</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>WeCookin&apos; uses your photo library so you can choose recipe and profile images.</string>
 	<key>UIApplicationSupportsMultipleScenes</key>
 	<false/>
 	<key>UILaunchScreen</key>

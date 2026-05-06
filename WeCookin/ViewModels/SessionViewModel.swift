@@ -219,7 +219,7 @@ final class SessionViewModel: ObservableObject {
                 var random: UInt8 = 0
                 let status = SecRandomCopyBytes(kSecRandomDefault, 1, &random)
                 if status != errSecSuccess {
-                    fatalError("Unable to generate nonce. OSStatus \(status)")
+                    return UInt8.random(in: 0..<UInt8.max)
                 }
                 return random
             }

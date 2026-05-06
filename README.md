@@ -1,11 +1,11 @@
 # WeCookin
 
-WeCookin is a SwiftUI iPhone app for saving recipes from websites, Instagram posts, and other apps through the iOS Share Sheet. This starter focuses on an MVP with Firebase Authentication, Cloud Firestore, a shared household model, and a Share Extension that saves import drafts into an App Group for the main app to ingest.
+WeCookin is a SwiftUI iPhone app for saving recipes from websites, Instagram posts, and other apps through the iOS Share Sheet. This starter focuses on an MVP with Firebase Authentication, Cloud Firestore, a shared cooking book model, and a Share Extension that saves import drafts into an App Group for the main app to ingest.
 
 ## What is included
 
-- SwiftUI app shell with login and sign up
-- Household creation and invite-code join flow
+- SwiftUI app shell with Sign in with Apple
+- Cooking book creation and invite-code join flow
 - Home screen with search, tag filters, and recipe cards
 - Manual recipe creation flow with tags, notes, rating, and optional image
 - Recipe detail screen with tag editing, comments, reviews, and external sharing
@@ -40,7 +40,7 @@ WeCookin/
 - `RecipeCore` contains shared models and share-import storage used by both targets.
 - `WeCookin` contains the SwiftUI app, view models, theme, and Firebase-backed services.
 - `ShareExtension` contains the UIKit host controller and SwiftUI import flow for the Share Extension.
-- Firestore is the source of truth for households, recipes, comments, reviews, and tags.
+- Firestore is the source of truth for cooking books, recipes, comments, reviews, and tags.
 - The Share Extension saves a `RecipeDraft` into the shared App Group container. The main app imports those pending drafts into Firestore when the home screen starts.
 
 ## Setup
@@ -53,11 +53,12 @@ WeCookin/
 4. Add an iOS app in Firebase for the main app bundle identifier.
 5. Download `GoogleService-Info.plist` and add it to the `WeCookin` app target in Xcode.
 6. In Firebase Console, enable:
-   - Authentication with Email/Password
+   - Authentication with Apple
    - Cloud Firestore
    - Cloud Storage
 7. In Apple Developer / Xcode Signing & Capabilities, enable:
    - App Groups for both the app and the Share Extension
+   - Sign in with Apple
    - The same group identifier used in [AppConstants.swift](/Users/szy/Documents/GitHub/recipe/RecipeCore/Utilities/AppConstants.swift:3)
 8. Generate the Xcode project:
 
@@ -69,6 +70,9 @@ xcodegen generate
 10. Add a second Firebase app entry only if you decide later to use Firebase directly inside the Share Extension. The current MVP does not require that.
 11. Build and run the main app once to create a user account.
 12. In the simulator or on-device, enable the Share Extension in the iOS Share Sheet if it does not appear automatically under “More”.
+13. Deploy the included Firebase security rules before going live:
+   - [firestore.rules](/Users/szy/Documents/GitHub/recipe/firestore.rules)
+   - [storage.rules](/Users/szy/Documents/GitHub/recipe/storage.rules)
 
 ## Share Extension behavior
 
@@ -131,17 +135,16 @@ and returns:
 
 ## MVP assumptions
 
-- Email/password auth is sufficient for the first build.
-- One active household per user is supported in the UI, even though the data model supports multiple household memberships.
-- Recipes are stored under a household subcollection in Firestore.
+- One active cooking book per user is supported in the UI, even though the data model supports multiple memberships.
+- Recipes are stored under a cooking book subcollection in Firestore.
 - Ratings are 1 through 5 stars.
-- Comments and reviews are separate records so households can keep lightweight discussion and rating history.
+- Comments and reviews are separate records so cooking books can keep lightweight discussion and rating history.
 - Share imports are finalized by the main app after extension save, rather than writing directly to Firestore from the extension.
 
 ## Recommended next steps
 
-- Add a proper invite screen showing the current household code inside the home view.
+- Add a proper invite screen showing the current cooking book code inside the home view.
 - Add HTML/Open Graph parsing for web URLs fetched inside the main app after import.
 - Add offline caching and optimistic local persistence.
-- Add edit/delete recipe flows and household switching.
+- Add edit/delete recipe flows and cooking book switching.
 - Add image resizing and duplicate detection for imports.

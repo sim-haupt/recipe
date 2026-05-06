@@ -22,7 +22,11 @@ struct WeCookinApp: App {
 
     private static func makeEnvironment() -> AppEnvironment {
         guard Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist") != nil else {
+            #if DEBUG
             return .demo
+            #else
+            return .misconfigured(message: "This build is missing Firebase configuration. Add GoogleService-Info.plist before shipping.")
+            #endif
         }
 
         configureFirebaseIfAvailable()
