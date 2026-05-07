@@ -2,7 +2,7 @@ import SwiftUI
 import UIKit
 
 final class ShareViewController: UIViewController {
-    private var hostingController: UIHostingController<ShareComposerView>?
+    private var hostingController: UIHostingController<AnyView>?
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -10,7 +10,7 @@ final class ShareViewController: UIViewController {
 
         let extensionItems = extensionContext?.inputItems as? [NSExtensionItem] ?? []
         let viewModel = ShareViewModel(extensionItems: extensionItems)
-        let rootView = ShareComposerView(
+        let rootView = AnyView(ShareComposerView(
             viewModel: viewModel,
             onCancel: { [weak self] in
                 self?.extensionContext?.completeRequest(returningItems: nil)
@@ -19,7 +19,7 @@ final class ShareViewController: UIViewController {
                 self?.extensionContext?.completeRequest(returningItems: nil)
             }
         )
-        .preferredColorScheme(.light)
+        .preferredColorScheme(.light))
 
         let hostingController = UIHostingController(rootView: rootView)
         addChild(hostingController)
