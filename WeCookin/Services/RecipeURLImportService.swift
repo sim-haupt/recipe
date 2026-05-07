@@ -39,13 +39,13 @@ final class RecipeURLImportService: RecipeURLImportServicing {
         async let linkMetadataTask: LPLinkMetadata? = shouldLoadLinkMetadata ? (try? fetchLinkMetadata(from: sourceURL)) : nil
 
         let linkMetadata = await linkMetadataTask
-        let htmlMetadata = try? await htmlMetadataTask
+       let htmlMetadata = try? await htmlMetadataTask
 
         let resolvedURL = htmlMetadata?.canonicalURL ?? linkMetadata?.originalURL ?? linkMetadata?.url ?? sourceURL
         let title = firstNonEmpty([
+            htmlMetadata?.pageTitle,
             htmlMetadata?.openGraphTitle,
             htmlMetadata?.twitterTitle,
-            htmlMetadata?.pageTitle,
             linkMetadata?.title,
             fallbackTitle(from: resolvedURL)
         ]) ?? "Imported Recipe"

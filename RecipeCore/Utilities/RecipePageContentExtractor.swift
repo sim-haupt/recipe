@@ -35,7 +35,7 @@ enum RecipePageContentExtractor {
         let bodyText = preferredBodyText(from: html, recipeJSONLD: recipeJSONLD)
 
         return RecipePageContent(
-            pageTitle: firstNonEmpty([recipeJSONLD?.name, pageTitle]),
+            pageTitle: pageTitle,
             metaDescription: firstNonEmpty([recipeJSONLD?.description, metaDescription]),
             openGraphTitle: firstNonEmpty([recipeJSONLD?.name, openGraphTitle]),
             openGraphDescription: firstNonEmpty([recipeJSONLD?.description, openGraphDescription]),
