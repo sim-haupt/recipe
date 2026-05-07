@@ -17,6 +17,7 @@ struct WeCookinApp: App {
             RootView()
                 .environmentObject(sessionViewModel)
                 .environment(\.appEnvironment, environment)
+                .preferredColorScheme(.light)
         }
     }
 

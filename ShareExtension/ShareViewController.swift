@@ -6,6 +6,7 @@ final class ShareViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        overrideUserInterfaceStyle = .light
 
         let extensionItems = extensionContext?.inputItems as? [NSExtensionItem] ?? []
         let viewModel = ShareViewModel(extensionItems: extensionItems)
@@ -18,6 +19,7 @@ final class ShareViewController: UIViewController {
                 self?.extensionContext?.completeRequest(returningItems: nil)
             }
         )
+        .preferredColorScheme(.light)
 
         let hostingController = UIHostingController(rootView: rootView)
         addChild(hostingController)
